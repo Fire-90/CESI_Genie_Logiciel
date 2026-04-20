@@ -9,47 +9,117 @@ namespace EasySave.ConsoleApp
 {
     class Program
     {
+        // Déclaration globale pour un accès depuis les différentes méthodes
+        private static List<BackupJob> _jobs;
+        private static BackupEngine _engine;
+
         static async Task Main(string[] args)
         {
-            // Initialisation d'une liste de travaux simulée (à remplacer par la lecture d'un fichier JSON de configuration)
-            var jobs = new List<BackupJob>
+            InitializeApplication();
+
+            // S'il y a des arguments, on exécute directement (Mode CLI)
+            if (args.Length > 0)
+            {
+                await ExecuteJobsAsync(args[0]);
+            }
+            // Sinon, on lance le mode interactif (Menu)
+            else
+            {
+                await RunInteractiveMenuAsync();
+            }
+        }
+
+        private static void InitializeApplication()
+        {
+            // Initialisation d'une liste de travaux simulée
+            _jobs = new List<BackupJob>
             {
                 new BackupJob(1, "Job1", @"C:\Source1", @"D:\Backup1", BackupType.Full),
                 new BackupJob(2, "Job2", @"C:\Source2", @"D:\Backup2", BackupType.Differential),
                 new BackupJob(3, "Job3", @"C:\Source3", @"D:\Backup3", BackupType.Full)
             };
 
-            if (args.Length > 0)
+            _engine = new BackupEngine();
+
+            // Abonnement à l'événement pour affichage console
+            _engine.OnProgressUpdate += (file, remaining) =>
             {
-                List<int> jobIdsToExecute = ParseCommandLineArgs(args[0]);
-                var engine = new BackupEngine();
+                Console.WriteLine($"   Copie en cours : {file}");
+            };
+        }
 
-                // Abonnement à l'événement pour affichage console
-                engine.OnProgressUpdate += (file, remaining) =>
-                {
-                    Console.WriteLine($"Copying: {file}");
-                };
+        private static async Task RunInteractiveMenuAsync()
+        {
+            bool exit = false;
 
-                foreach (var id in jobIdsToExecute)
+            while (!exit)
+            {
+                Console.WriteLine("\n==================================");
+                Console.WriteLine("        EASY SAVE - MENU");
+                Console.WriteLine("==================================");
+                Console.WriteLine("Travaux de sauvegarde configurés :");
+
+                foreach (var job in _jobs)
                 {
-                    var job = jobs.FirstOrDefault(j => j.Id == id);
-                    if (job != null)
-                    {
-                        Console.WriteLine($"\n--- Starting Job: {job.Name} ---");
-                        await engine.ExecuteJobAsync(job);
-                        Console.WriteLine($"--- Finished Job: {job.Name} ---");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Job ID {id} not found.");
-                    }
+                    Console.WriteLine($" [{job.Id}] {job.Name} ({job.Type})");
+                    Console.WriteLine($"     Source : {job.SourceDirectory}");
+                    Console.WriteLine($"     Cible  : {job.TargetDirectory}");
+                }
+
+                Console.WriteLine("\nOptions :");
+                Console.WriteLine(" - Saisissez les ID à exécuter (ex: 1, 1-3, 1;3)");
+                Console.WriteLine(" - Saisissez 'Q' pour quitter");
+                Console.Write("\nVotre choix : ");
+
+                string input = Console.ReadLine();
+
+                if (string.IsNullOrWhiteSpace(input))
+                {
+                    continue;
+                }
+
+                if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase))
+                {
+                    exit = true;
+                    Console.WriteLine("Fermeture de l'application...");
+                }
+                else
+                {
+                    await ExecuteJobsAsync(input);
                 }
             }
-            else
+        }
+
+        private static async Task ExecuteJobsAsync(string inputArguments)
+        {
+            List<int> jobIdsToExecute = ParseCommandLineArgs(inputArguments);
+
+            if (jobIdsToExecute.Count == 0)
             {
-                Console.WriteLine("EasySave v1.0");
-                Console.WriteLine("Usage: EasySave.exe <1-3> or <1;3>");
-                // Ici, lancer le mode interactif (menus) si aucun argument n'est fourni
+                Console.WriteLine("\n[Erreur] Aucune tâche correspondante trouvée pour cette saisie.");
+                return;
+            }
+
+            foreach (var id in jobIdsToExecute)
+            {
+                var job = _jobs.FirstOrDefault(j => j.Id == id);
+                if (job != null)
+                {
+                    Console.WriteLine($"\n>>> Démarrage du travail : {job.Name} <<<");
+                    try
+                    {
+                        await _engine.ExecuteJobAsync(job);
+                        Console.WriteLine($">>> Fin du travail : {job.Name} avec succès <<<");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[Erreur] Échec du travail {job.Name} : {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[Avertissement] Le travail avec l'ID {id} n'existe pas.");
+                }
             }
         }
 
