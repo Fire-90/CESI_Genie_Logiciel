@@ -13,7 +13,6 @@ namespace EasySave.ViewModels
 
         private StateTracker _stateTracker;
 
-        // Le constructeur prend désormais le tracker en paramètre
         public BackupEngine(StateTracker stateTracker)
         {
             _stateTracker = stateTracker;
@@ -36,7 +35,6 @@ namespace EasySave.ViewModels
                 totalFilesSize += new FileInfo(file).Length;
             }
 
-            // Activation de l'état dans le state.json
             _stateTracker.UpdateState(job.Name, s =>
             {
                 s.State = "ACTIVE";

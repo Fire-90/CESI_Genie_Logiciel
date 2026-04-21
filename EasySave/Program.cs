@@ -60,7 +60,6 @@ namespace EasySave.ConsoleApp
                 {
                     List<int> idsToExecute = ParseArgs(input);
 
-                    // Feedback : Si le parsing ne renvoie aucun ID valide
                     if (idsToExecute.Count == 0)
                     {
                         _view.DisplayMessage("InvalidInput");
@@ -70,7 +69,6 @@ namespace EasySave.ConsoleApp
                         await ExecuteJobsAsync(idsToExecute);
                     }
 
-                    // Bloque l'écran pour permettre de lire le résultat avant de clear
                     _view.WaitForAcknowledge();
                 }
             }
@@ -82,7 +80,6 @@ namespace EasySave.ConsoleApp
             {
                 var job = _jobs.FirstOrDefault(j => j.Id == id);
 
-                // Feedback : Si l'utilisateur saisit "9" et que l'ID n'existe pas
                 if (job == null)
                 {
                     _view.DisplayMessage("JobNotFound", id);

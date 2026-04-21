@@ -76,7 +76,6 @@ namespace EasySave.ViewModels
             }
         }
 
-        // La nouvelle méthode intégrée correctement à l'intérieur de la classe
         public void UpdateJobName(string oldName, string newName)
         {
             lock (_lockObj)

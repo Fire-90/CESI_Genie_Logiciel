@@ -38,7 +38,6 @@ namespace EasySave.Models
 
         private DailyLogger()
         {
-            // Création du dossier "logs" dans le même répertoire que le .exe
             string exePath = AppDomain.CurrentDomain.BaseDirectory;
             _logDirectory = Path.Combine(exePath, "data", "logs");
 

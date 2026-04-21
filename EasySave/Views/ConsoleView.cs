@@ -26,7 +26,7 @@ namespace EasySave.Views
 
         public void DisplayMenu(List<BackupJob> jobs)
         {
-            Console.Clear(); // Nettoie l'écran à chaque réaffichage
+            Console.Clear();
             Console.WriteLine("==================================");
             Console.WriteLine(LanguageManager.GetString("MenuTitle"));
             Console.WriteLine("==================================");
@@ -62,7 +62,7 @@ namespace EasySave.Views
         public void WaitForAcknowledge()
         {
             Console.WriteLine(LanguageManager.GetString("PressAnyKey"));
-            Console.ReadKey(); // Met l'application en pause
+            Console.ReadKey();
         }
 
         public void ConfigureJob(BackupJob job)
