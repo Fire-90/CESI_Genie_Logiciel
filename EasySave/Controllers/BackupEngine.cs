@@ -46,7 +46,6 @@ namespace EasySave.ViewModels
 
             await ProcessDirectoryAsync(job.SourceDirectory, job.TargetDirectory, job);
 
-            // Remise à zéro à la fin de la sauvegarde (comme dans l'exemple)
             _stateTracker.UpdateState(job.Name, s =>
             {
                 s.State = "END";
