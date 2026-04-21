@@ -1,0 +1,33 @@
+{
+ "Name": "Save2",
+ "FileSource": "D:\\projet_3\\TEST\\source1\\rapport.pdf",
+ "FileTarget": "E:\\SAVE\\projet_3\\TEST\\source1\\rapport.pdf",
+ "FileSize": 1704592,
+ "FileTransferTime": 58.002
+ "time": "17/12/2020 16:17:29"
+ },
+
+ {
+ "Name": "Save1",
+ "FileSource": "D:\\projet_2\\TEST\\source1234\\fichiertxt_1.txt",
+ "FileTarget": "E:\\SAVE\\projet_2\\TEST\\source1234\\fichiertxt_1.txt",
+ "FileSize": 174592,
+ "FileTransferTime": 38.029
+ "time": "17/12/2020 17:06:49"
+ },
+ {
+ "Name": "Save1",
+ "FileSource": "D:\\projet_2\\TEST\\source1234\\fichiertxt_2.txt",
+ "FileTarget": "E:\\SAVE\\projet_2\\TEST\\source1234\\fichiertxt_2.txt",
+ "FileSize": 104230,
+ "FileTransferTime": 32.121
+ "time": "17/12/2020 17:06:50"
+ }
+ {
+ "Name": "Save1",
+ "FileSource": "D:\\projet_2\\TEST\\source1234\\fichiertxt_3.txt",
+ "FileTarget": "E:\\SAVE\\projet_2\\TEST\\source1234\\fichiertxt_3.txt",
+ "FileSize": 1045,
+ "FileTransferTime": 3.831
+ "time": "17/12/2020 17:06:52"
+ }

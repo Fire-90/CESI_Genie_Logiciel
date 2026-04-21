@@ -1,0 +1,36 @@
+[
+ {
+ "Name": "Save1",
+ "SourceFilePath": "",
+ "TargetFilePath": "",
+ "State": "END",
+ "TotalFilesToCopy": 0,
+ "TotalFilesSize": 0,
+ "NbFilesLeftToDo": 0,
+ "Progression": 0
+ }
+ {
+ "Name": "Save2",
+ "SourceFilePath": "C:\\prog
+Sys\\Projet\\gr6_save\\EasySave_Group6_1.1\\api-ms-win-core-errorhandling-l1-1-0.dll
+",
+ "TargetFilePath":
+"D:\\save\\Projet\\gr6_save\\EasySave_Group6_1.1\\api-ms-win-core-errorhandling-l1-1
+-0.dll",
+ "State": "ACTIVE",
+ "TotalFilesToCopy": 3300,
+ "TotalFilesSize": 1240312777,
+ "NbFilesLeftToDo": 3274,
+ "Progression": 0
+ }
+ {
+ "Name": "Save3",
+ "SourceFilePath": "",
+ "TargetFilePath": "",
+ "State": "END",
+ "TotalFilesToCopy": 0,
+ "TotalFilesSize": 0,
+ "NbFilesLeftToDo": 0,
+ "Progression": 0
+ }
+]

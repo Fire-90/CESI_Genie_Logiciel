@@ -31,12 +31,14 @@ namespace EasySave.ConsoleApp
 
         private static void InitializeApplication()
         {
-            // Initialisation d'une liste de travaux simulée
+            // Initialisation d'une liste de 5 travaux avec les chemins spécifiques
             _jobs = new List<BackupJob>
             {
-                new BackupJob(1, "Job1", @"C:\Source1", @"D:\Backup1", BackupType.Full),
-                new BackupJob(2, "Job2", @"C:\Source2", @"D:\Backup2", BackupType.Differential),
-                new BackupJob(3, "Job3", @"C:\Source3", @"D:\Backup3", BackupType.Full)
+                new BackupJob(1, "Job1", @"C:\Users\Fire\Documents\Repos\Source1", @"C:\Users\Fire\Documents\Repos\Backup1", BackupType.Full),
+                new BackupJob(2, "Job2", @"C:\Users\Fire\Documents\Repos\Source2", @"C:\Users\Fire\Documents\Repos\Backup2", BackupType.Differential),
+                new BackupJob(3, "Job3", @"C:\Users\Fire\Documents\Repos\Source3", @"C:\Users\Fire\Documents\Repos\Backup3", BackupType.Full),
+                new BackupJob(4, "Job4", @"C:\Users\Fire\Documents\Repos\Source4", @"C:\Users\Fire\Documents\Repos\Backup4", BackupType.Differential),
+                new BackupJob(5, "Job5", @"C:\Users\Fire\Documents\Repos\Source5", @"C:\Users\Fire\Documents\Repos\Backup5", BackupType.Full)
             };
 
             _engine = new BackupEngine();
