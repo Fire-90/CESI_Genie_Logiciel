@@ -5,7 +5,8 @@ EasySave est une application console logicielle de sauvegarde de données, déve
 ## Fonctionnalités Principales
 
 * **Gestion de 5 travaux de sauvegarde :** Configuration, mémorisation et exécution de 5 emplacements (slots) distincts.
-* **Types de sauvegarde :** * *Complète :* Copie intégrale du répertoire source.
+* **Types de sauvegarde :**
+  * *Complète :* Copie intégrale du répertoire source.
   * *Différentielle :* Copie uniquement des fichiers modifiés ou nouveaux par rapport à la cible.
 * **Support Multilingue :** Sélection de la langue (Anglais / Français) au démarrage de l'application.
 * **Modes d'exécution :**
