@@ -10,14 +10,56 @@ namespace EasySave.Core
     public class BackupEngine
     {
         public delegate void ProgressUpdateHandler(string currentFile, int remainingFiles);
-        public event ProgressUpdateHandler OnProgressUpdate; // Prêt pour le Binding MVVM futur
+        public event ProgressUpdateHandler OnProgressUpdate;
+
+        private StateTracker _stateTracker;
+
+        // Le constructeur prend désormais le tracker en paramètre
+        public BackupEngine(StateTracker stateTracker)
+        {
+            _stateTracker = stateTracker;
+        }
 
         public async Task ExecuteJobAsync(BackupJob job)
         {
-            if (!Directory.Exists(job.SourceDirectory))
-                throw new DirectoryNotFoundException($"Source directory not found: {job.SourceDirectory}");
+            if (string.IsNullOrWhiteSpace(job.SourceDirectory) || !Directory.Exists(job.SourceDirectory))
+            {
+                throw new DirectoryNotFoundException($"Source invalide ou introuvable pour {job.Name}");
+            }
+
+            int totalFilesToCopy = 0;
+            long totalFilesSize = 0;
+
+            string[] allFiles = Directory.GetFiles(job.SourceDirectory, "*.*", SearchOption.AllDirectories);
+            foreach (string file in allFiles)
+            {
+                totalFilesToCopy++;
+                totalFilesSize += new FileInfo(file).Length;
+            }
+
+            // Activation de l'état dans le state.json
+            _stateTracker.UpdateState(job.Name, s =>
+            {
+                s.State = "ACTIVE";
+                s.TotalFilesToCopy = totalFilesToCopy;
+                s.TotalFilesSize = totalFilesSize;
+                s.NbFilesLeftToDo = totalFilesToCopy;
+                s.Progression = 0;
+            });
 
             await ProcessDirectoryAsync(job.SourceDirectory, job.TargetDirectory, job);
+
+            // Remise à zéro à la fin de la sauvegarde (comme dans l'exemple)
+            _stateTracker.UpdateState(job.Name, s =>
+            {
+                s.State = "END";
+                s.SourceFilePath = "";
+                s.TargetFilePath = "";
+                s.TotalFilesToCopy = 0;
+                s.TotalFilesSize = 0;
+                s.NbFilesLeftToDo = 0;
+                s.Progression = 0;
+            });
         }
 
         private async Task ProcessDirectoryAsync(string sourceDir, string targetDir, BackupJob job)
@@ -31,63 +73,68 @@ namespace EasySave.Core
 
                 FileInfo sourceFileInfo = new FileInfo(file);
 
-                // Logique de sauvegarde différentielle
                 if (job.Type == BackupType.Differential && File.Exists(targetFile))
                 {
-                    FileInfo targetFileInfo = new FileInfo(targetFile);
-                    if (sourceFileInfo.LastWriteTime <= targetFileInfo.LastWriteTime)
+                    if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
                     {
                         shouldCopy = false;
+                        _stateTracker.UpdateState(job.Name, s =>
+                        {
+                            s.NbFilesLeftToDo--;
+                            s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
+                        });
                     }
                 }
 
-                if (shouldCopy)
-                {
-                    await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
-                }
+                if (shouldCopy) await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
             }
 
-            // Récursivité pour les sous-répertoires
             foreach (string directory in Directory.GetDirectories(sourceDir))
             {
-                string targetSubDir = Path.Combine(targetDir, Path.GetFileName(directory));
-                await ProcessDirectoryAsync(directory, targetSubDir, job);
+                await ProcessDirectoryAsync(directory, Path.Combine(targetDir, Path.GetFileName(directory)), job);
             }
         }
 
         private async Task CopyFileWithLoggingAsync(string source, string target, string jobName, long fileSize)
         {
+            _stateTracker.UpdateState(jobName, s =>
+            {
+                s.SourceFilePath = source;
+                s.TargetFilePath = target;
+            });
+
             Stopwatch stopwatch = new Stopwatch();
             long timeMs = 0;
 
             try
             {
                 stopwatch.Start();
-                // Simulation d'une copie asynchrone pour l'exemple (en production, utiliser FileStream)
                 File.Copy(source, target, true);
                 stopwatch.Stop();
                 timeMs = stopwatch.ElapsedMilliseconds;
 
-                // Déclenchement de l'événement pour l'interface utilisateur / Fichier d'état
-                OnProgressUpdate?.Invoke(source, 0); // 0 est un placeholder pour les fichiers restants
+                _stateTracker.UpdateState(jobName, s =>
+                {
+                    s.NbFilesLeftToDo--;
+                    s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
+                });
+
+                OnProgressUpdate?.Invoke(source, 0); // Event optionnel
             }
             catch (Exception)
             {
                 stopwatch.Stop();
-                timeMs = -1; // -1 en cas d'erreur selon le cahier des charges
+                timeMs = -1;
             }
 
-            // Appel de la DLL EasyLog
-            var logEntry = new LogEntry
+            await DailyLogger.Instance.WriteLogAsync(new LogEntry
             {
-                BackupName = jobName,
-                SourceFile = source,
-                TargetFile = target,
+                Name = jobName,
+                FileSource = source,
+                FileTarget = target,
                 FileSize = fileSize,
-                TransferTimeMs = timeMs
-            };
-
-            await DailyLogger.Instance.WriteLogAsync(logEntry);
+                FileTransferTime = timeMs
+            });
         }
     }
 }

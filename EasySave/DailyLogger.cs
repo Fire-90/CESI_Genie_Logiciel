@@ -1,18 +1,31 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace EasyLog
 {
     public class LogEntry
     {
-        public string Timestamp { get; set; } = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        public string BackupName { get; set; }
-        public string SourceFile { get; set; }
-        public string TargetFile { get; set; }
+        [JsonPropertyName("Name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("FileSource")]
+        public string FileSource { get; set; }
+
+        [JsonPropertyName("FileTarget")]
+        public string FileTarget { get; set; }
+
+        [JsonPropertyName("FileSize")]
         public long FileSize { get; set; }
-        public long TransferTimeMs { get; set; }
+
+        [JsonPropertyName("FileTransferTime")]
+        public double FileTransferTime { get; set; }
+
+        [JsonPropertyName("time")]
+        public string Time { get; set; } = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
     }
 
     public sealed class DailyLogger
@@ -25,8 +38,10 @@ namespace EasyLog
 
         private DailyLogger()
         {
-            // Utilisation de CommonApplicationData (ex: C:\ProgramData\EasySave\Logs)
-            _logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "EasySave", "Logs");
+            // Création du dossier "logs" dans le même répertoire que le .exe
+            string exePath = AppDomain.CurrentDomain.BaseDirectory;
+            _logDirectory = Path.Combine(exePath, "data", "logs");
+
             if (!Directory.Exists(_logDirectory))
             {
                 Directory.CreateDirectory(_logDirectory);
@@ -38,15 +53,32 @@ namespace EasyLog
             string fileName = $"{DateTime.Now:yyyy-MM-dd}.json";
             string filePath = Path.Combine(_logDirectory, fileName);
 
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string jsonString = JsonSerializer.Serialize(entry, options);
-
-            // Verrou pour éviter les conflits d'écriture si plusieurs threads de sauvegarde tournent
             lock (_lockObj)
             {
-                // Ajout d'un retour à la ligne pour la lisibilité Notepad comme demandé
-                File.AppendAllText(filePath, jsonString + Environment.NewLine);
+                List<LogEntry> logs = new List<LogEntry>();
+
+                // Lecture du fichier existant pour conserver un tableau JSON valide
+                if (File.Exists(filePath))
+                {
+                    try
+                    {
+                        string existingJson = File.ReadAllText(filePath);
+                        if (!string.IsNullOrWhiteSpace(existingJson))
+                        {
+                            logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
+                        }
+                    }
+                    catch (JsonException) { /* Fichier ignoré si corrompu */ }
+                }
+
+                logs.Add(entry);
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                string jsonString = JsonSerializer.Serialize(logs, options);
+
+                File.WriteAllText(filePath, jsonString);
             }
+
             await Task.CompletedTask;
         }
     }

@@ -1,4 +1,6 @@
-﻿namespace EasySave.Models
+﻿using System.Text.Json.Serialization;
+
+namespace EasySave.Models
 {
     public enum BackupType
     {
@@ -13,6 +15,9 @@
         public string SourceDirectory { get; set; }
         public string TargetDirectory { get; set; }
         public BackupType Type { get; set; }
+
+        // Constructeur vide requis pour la sérialisation JSON
+        public BackupJob() { }
 
         public BackupJob(int id, string name, string sourceDirectory, string targetDirectory, BackupType type)
         {
