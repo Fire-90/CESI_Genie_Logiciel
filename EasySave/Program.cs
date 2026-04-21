@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EasySave.Models;
-using EasySave.Core;
+using EasySave.ViewModels;
+using EasySave.Views;
 
 namespace EasySave.ConsoleApp
 {
@@ -12,10 +13,13 @@ namespace EasySave.ConsoleApp
         private static List<BackupJob> _jobs;
         private static BackupEngine _engine;
         private static ConfigManager _configManager;
-        private static StateTracker _stateTracker; // Rendu accessible globalement
+        private static StateTracker _stateTracker;
 
         static async Task Main(string[] args)
         {
+            // Étape 1 : Choix obligatoire de la langue au démarrage
+            ChooseLanguage();
+
             InitializeApplication();
 
             if (args.Length > 0)
@@ -28,6 +32,34 @@ namespace EasySave.ConsoleApp
             }
         }
 
+        private static void ChooseLanguage()
+        {
+            string choice = "";
+            while (choice != "1" && choice != "2")
+            {
+                Console.Clear();
+                Console.WriteLine("==================================");
+                Console.WriteLine("        LANGUAGE / LANGUE         ");
+                Console.WriteLine("==================================");
+                Console.WriteLine(" 1 - English (EN)");
+                Console.WriteLine(" 2 - Français (FR)");
+                Console.Write("\n Choose / Choisissez (1/2) : ");
+
+                choice = Console.ReadLine()?.Trim();
+            }
+
+            if (choice == "2")
+            {
+                LanguageManager.SetLanguage("FR");
+            }
+            else
+            {
+                LanguageManager.SetLanguage("EN");
+            }
+
+            Console.Clear(); // Nettoie la console avant d'afficher le menu principal
+        }
+
         private static void InitializeApplication()
         {
             _configManager = new ConfigManager();
@@ -38,7 +70,7 @@ namespace EasySave.ConsoleApp
 
             _engine.OnProgressUpdate += (file, remaining) =>
             {
-                Console.WriteLine($"   Copie en cours : {file}");
+                Console.WriteLine($"{LanguageManager.GetString("Copying")}{file}");
             };
         }
 
@@ -48,30 +80,39 @@ namespace EasySave.ConsoleApp
             while (!exit)
             {
                 Console.WriteLine("\n==================================");
-                Console.WriteLine("        EASY SAVE - MENU");
+                Console.WriteLine(LanguageManager.GetString("MenuTitle"));
                 Console.WriteLine("==================================");
 
                 foreach (var job in _jobs)
                 {
-                    string status = string.IsNullOrWhiteSpace(job.SourceDirectory) ? "[VIDE]" : "[PRÊT]";
+                    string status = string.IsNullOrWhiteSpace(job.SourceDirectory)
+                        ? LanguageManager.GetString("Empty")
+                        : LanguageManager.GetString("Ready");
+
                     Console.WriteLine($" [{job.Id}] {job.Name} {status} ({job.Type})");
                     if (!string.IsNullOrWhiteSpace(job.SourceDirectory))
                     {
-                        Console.WriteLine($"     Source : {job.SourceDirectory}");
-                        Console.WriteLine($"     Cible  : {job.TargetDirectory}");
+                        Console.WriteLine($"{LanguageManager.GetString("Source")}{job.SourceDirectory}");
+                        Console.WriteLine($"{LanguageManager.GetString("Target")}{job.TargetDirectory}");
                     }
                 }
 
-                Console.WriteLine("\nOptions :");
-                Console.WriteLine(" - Saisissez les ID à exécuter (ex: 1, 1-3, 1;3)");
-                Console.WriteLine(" - Saisissez 'Q' pour quitter");
-                Console.Write("\nVotre choix : ");
+                Console.WriteLine(LanguageManager.GetString("OptionsTitle"));
+                Console.WriteLine(LanguageManager.GetString("OptionExecute"));
+                Console.WriteLine(LanguageManager.GetString("OptionQuit"));
+                Console.Write(LanguageManager.GetString("YourChoice"));
 
                 string input = Console.ReadLine();
                 if (string.IsNullOrWhiteSpace(input)) continue;
 
-                if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase)) exit = true;
-                else await ExecuteJobsAsync(input);
+                if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase))
+                {
+                    exit = true;
+                }
+                else
+                {
+                    await ExecuteJobsAsync(input);
+                }
             }
         }
 
@@ -86,49 +127,44 @@ namespace EasySave.ConsoleApp
                 var job = _jobs.FirstOrDefault(j => j.Id == id);
                 if (job != null)
                 {
-                    // VERIFICATION : Si le slot est vide, on demande la configuration
                     if (string.IsNullOrWhiteSpace(job.SourceDirectory))
                     {
-                        Console.WriteLine($"\n[INFO] L'emplacement [{job.Id}] est vide. Configuration requise.");
+                        Console.WriteLine(string.Format(LanguageManager.GetString("SlotEmpty"), job.Id));
                         string oldName = job.Name;
 
                         ConfigureJobInteractively(job);
 
-                        // Sauvegarde immédiate dans data/config.json
                         _configManager.SaveConfig(_jobs);
-
-                        // Met à jour le nom dans data/state.json
                         _stateTracker.UpdateJobName(oldName, job.Name);
                     }
 
-                    Console.WriteLine($"\n>>> Démarrage du travail : {job.Name} <<<");
+                    Console.WriteLine(string.Format(LanguageManager.GetString("JobStart"), job.Name));
                     try
                     {
                         await _engine.ExecuteJobAsync(job);
-                        Console.WriteLine($">>> Fin du travail : {job.Name} <<<");
+                        Console.WriteLine(string.Format(LanguageManager.GetString("JobEnd"), job.Name));
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[Erreur] Échec de {job.Name} : {ex.Message}");
+                        Console.WriteLine(string.Format(LanguageManager.GetString("JobError"), job.Name, ex.Message));
                     }
                 }
             }
         }
 
-        // Nouvelle méthode de saisie utilisateur
         private static void ConfigureJobInteractively(BackupJob job)
         {
-            Console.Write(" -> Nom de la sauvegarde : ");
+            Console.Write(LanguageManager.GetString("AskName"));
             string nameInput = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(nameInput)) job.Name = nameInput;
 
-            Console.Write(" -> Répertoire source complet (ex: C:\\Source) : ");
+            Console.Write(LanguageManager.GetString("AskSource"));
             job.SourceDirectory = Console.ReadLine();
 
-            Console.Write(" -> Répertoire cible complet (ex: D:\\Backup) : ");
+            Console.Write(LanguageManager.GetString("AskTarget"));
             job.TargetDirectory = Console.ReadLine();
 
-            Console.Write(" -> Type (1 = Complet, 2 = Différentiel) : ");
+            Console.Write(LanguageManager.GetString("AskType"));
             string typeInput = Console.ReadLine();
             job.Type = (typeInput == "2") ? BackupType.Differential : BackupType.Full;
         }

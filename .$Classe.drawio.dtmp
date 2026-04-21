@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17">
   <diagram name="Page-1" id="5NM3SS1Y1fPTl3t25ryW">
-    <mxGraphModel dx="1235" dy="787" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4681" pageHeight="3300" math="0" shadow="0">
+    <mxGraphModel dx="840" dy="535" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4681" pageHeight="3300" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -256,7 +256,7 @@
         <mxCell id="x9RnbhftmPcfWUh4b_vL-88" value="Met à jour" style="startArrow=none;endArrow=open;endSize=12;exitX=0.7;exitY=1;entryX=0.21;entryY=0;rounded=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="x9RnbhftmPcfWUh4b_vL-60" target="x9RnbhftmPcfWUh4b_vL-50">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="x9RnbhftmPcfWUh4b_vL-89" value="Exécute" style="dashed=1;startArrow=none;endArrow=open;endSize=12;exitX=0.5;exitY=1;entryX=1;entryY=0.32;rounded=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="x9RnbhftmPcfWUh4b_vL-60" target="x9RnbhftmPcfWUh4b_vL-23">
+        <mxCell id="x9RnbhftmPcfWUh4b_vL-89" value="Exécute" style="dashed=1;startArrow=none;endArrow=open;endSize=12;exitX=0.5;exitY=1;rounded=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="x9RnbhftmPcfWUh4b_vL-60" target="x9RnbhftmPcfWUh4b_vL-23">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="x9RnbhftmPcfWUh4b_vL-90" value="Consomme (DLL)" style="startArrow=none;endArrow=open;endSize=12;exitX=0.3;exitY=1;entryX=1;entryY=0.38;rounded=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="x9RnbhftmPcfWUh4b_vL-60" target="x9RnbhftmPcfWUh4b_vL-2">
@@ -271,7 +271,7 @@
         <mxCell id="x9RnbhftmPcfWUh4b_vL-93" value="5" style="edgeLabel;resizable=0;labelBackgroundColor=none;fontSize=12;align=left;verticalAlign=bottom;" vertex="1" parent="x9RnbhftmPcfWUh4b_vL-91">
           <mxGeometry x="1" relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="x9RnbhftmPcfWUh4b_vL-94" value="Initialise à partir de" style="dashed=1;startArrow=none;endArrow=open;endSize=12;exitX=0.25;exitY=1;entryX=1;entryY=0.36;rounded=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="x9RnbhftmPcfWUh4b_vL-50" target="x9RnbhftmPcfWUh4b_vL-23">
+        <mxCell id="x9RnbhftmPcfWUh4b_vL-94" value="Initialise à partir de" style="dashed=1;startArrow=none;endArrow=open;endSize=12;exitX=0.25;exitY=1;rounded=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="x9RnbhftmPcfWUh4b_vL-50" target="x9RnbhftmPcfWUh4b_vL-23">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="x9RnbhftmPcfWUh4b_vL-95" value="Écrit (JSON)" style="dashed=1;startArrow=none;endArrow=open;endSize=12;exitX=0.5;exitY=1;entryX=0.5;entryY=0;rounded=0;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="x9RnbhftmPcfWUh4b_vL-2" target="x9RnbhftmPcfWUh4b_vL-10">

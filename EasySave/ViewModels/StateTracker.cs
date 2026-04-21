@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using EasySave.Models;
 
-namespace EasySave.Core
+namespace EasySave.ViewModels
 {
     public class JobStateInfo
     {
