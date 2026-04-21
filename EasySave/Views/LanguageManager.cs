@@ -1,18 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace EasySave.Views
+namespace EasySave.Core
 {
     public static class LanguageManager
     {
-        public static string CurrentLanguage { get; private set; } = "EN"; // Anglais par défaut
+        public static string CurrentLanguage { get; private set; } = "EN";
 
         public static void SetLanguage(string languageCode)
         {
-            if (languageCode == "EN" || languageCode == "FR")
-            {
-                CurrentLanguage = languageCode;
-            }
+            if (languageCode == "EN" || languageCode == "FR") CurrentLanguage = languageCode;
         }
 
         private static readonly Dictionary<string, Dictionary<string, string>> Translations = new Dictionary<string, Dictionary<string, string>>
@@ -21,7 +18,7 @@ namespace EasySave.Views
                 "EN", new Dictionary<string, string>
                 {
                     { "MenuTitle", "        EASY SAVE - MENU" },
-                    { "Copying", "   Copying : " },
+                    { "Copying", "   Copying : {0}" },
                     { "Empty", "[EMPTY]" },
                     { "Ready", "[READY]" },
                     { "Source", "     Source : " },
@@ -37,14 +34,18 @@ namespace EasySave.Views
                     { "AskType", " -> Type (1 = Full, 2 = Differential) : " },
                     { "JobStart", "\n>>> Starting job : {0} <<<" },
                     { "JobEnd", ">>> Job finished : {0} <<<" },
-                    { "JobError", "[Error] Job {0} failed : {1}" }
+                    { "JobError", "[Error] Job {0} failed : {1}" },
+                    { "InvalidInput", "\n[Error] Invalid input. Please enter a valid ID format (e.g., 1, 1-3, 1;3) or 'Q'." },
+                    { "JobNotFound", "\n[Warning] No backup job found with ID {0}." },
+                    { "ConfigSuccess", "[Success] Configuration saved for {0}." },
+                    { "PressAnyKey", "\nPress any key to return to the menu..." }
                 }
             },
             {
                 "FR", new Dictionary<string, string>
                 {
                     { "MenuTitle", "        EASY SAVE - MENU" },
-                    { "Copying", "   Copie en cours : " },
+                    { "Copying", "   Copie en cours : {0}" },
                     { "Empty", "[VIDE]" },
                     { "Ready", "[PRÊT]" },
                     { "Source", "     Source : " },
@@ -60,7 +61,11 @@ namespace EasySave.Views
                     { "AskType", " -> Type (1 = Complet, 2 = Différentiel) : " },
                     { "JobStart", "\n>>> Démarrage du travail : {0} <<<" },
                     { "JobEnd", ">>> Fin du travail : {0} <<<" },
-                    { "JobError", "[Erreur] Échec de {0} : {1}" }
+                    { "JobError", "[Erreur] Échec de {0} : {1}" },
+                    { "InvalidInput", "\n[Erreur] Saisie invalide. Veuillez entrer un format d'ID valide (ex: 1, 1-3, 1;3) ou 'Q'." },
+                    { "JobNotFound", "\n[Attention] Aucun travail de sauvegarde trouvé avec l'ID {0}." },
+                    { "ConfigSuccess", "[Succès] Configuration enregistrée pour {0}." },
+                    { "PressAnyKey", "\nAppuyez sur une touche pour retourner au menu..." }
                 }
             }
         };
