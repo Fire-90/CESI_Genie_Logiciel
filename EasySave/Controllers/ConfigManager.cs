@@ -31,6 +31,7 @@ namespace EasySave.ViewModels
 
         private List<BackupJob> CreateDefaultConfig()
         {
+
             var defaultJobs = new List<BackupJob>();
             for (int i = 1; i <= 5; i++)
             {
@@ -39,6 +40,20 @@ namespace EasySave.ViewModels
             }
             SaveConfig(defaultJobs);
             return defaultJobs;
+        }
+
+        public void DeleteConfig(BackupJob job)
+        {
+            var jobs = new List<BackupJob>();
+            if (job != null)
+            {
+                job.Name = $"Save{job.Id}";
+                job.SourceDirectory = "";
+                job.TargetDirectory = "";
+                job.Type = BackupType.Full;
+                SaveConfig(jobs);
+            }
+
         }
 
         public void SaveConfig(List<BackupJob> jobs)

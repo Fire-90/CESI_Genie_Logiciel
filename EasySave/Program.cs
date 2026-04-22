@@ -34,7 +34,7 @@ namespace EasySave.ConsoleApp
 
             if (args.Length > 0)
             {
-                await ExecuteJobsAsync(ParseArgs(args[0]));
+                await ExecuteJobsAsync(ParseArgs(args[0]), true);
             }
             else
             {
@@ -52,9 +52,34 @@ namespace EasySave.ConsoleApp
 
                 if (string.IsNullOrWhiteSpace(input)) continue;
 
-                if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase))
+                if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase)) 
                 {
                     exit = true;
+                }
+                else if (input.Trim().Equals("E", StringComparison.OrdinalIgnoreCase))
+                {
+                    _view.DisplayMessage("ChooseEditConfig");
+                    string editId = _view.ReadInput();
+                    if (string.IsNullOrWhiteSpace(editId)) continue;
+                    List<int> idsToExecute = ParseArgs(editId);
+                    await ExecuteJobsAsync(idsToExecute, false);
+
+                }
+                else if (input.Trim().Equals("D", StringComparison.OrdinalIgnoreCase))
+                {
+                    _view.DisplayMessage("ChooseDeleteConfig");
+                    string deleteInput = _view.ReadInput();
+                    if (int.TryParse(deleteInput, out int deleteId))
+                    {
+                        var job = _jobs.FirstOrDefault(j => j.Id == deleteId);
+                        _configManager.DeleteConfig(job);
+                        _view.DisplayMessage("DeleteSuccess");
+                        _stateTracker.UpdateJobName(job.Name, "");
+                    }
+                    else
+                    {
+                        _view.DisplayMessage("InvalidDeleteInput");
+                    }
                 }
                 else
                 {
@@ -66,7 +91,7 @@ namespace EasySave.ConsoleApp
                     }
                     else
                     {
-                        await ExecuteJobsAsync(idsToExecute);
+                        await ExecuteJobsAsync(idsToExecute, true);
                     }
 
                     _view.WaitForAcknowledge();
@@ -74,7 +99,7 @@ namespace EasySave.ConsoleApp
             }
         }
 
-        private static async Task ExecuteJobsAsync(List<int> ids)
+        private static async Task ExecuteJobsAsync(List<int> ids, bool execute)
         {
             foreach (var id in ids)
             {
@@ -86,9 +111,13 @@ namespace EasySave.ConsoleApp
                     continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(job.SourceDirectory))
+                if (string.IsNullOrWhiteSpace(job.SourceDirectory) || !execute)
                 {
-                    _view.DisplayMessage("SlotEmpty", job.Id);
+                    if (execute)
+                    {
+                        _view.DisplayMessage("SlotEmpty", job.Id);
+                    }
+                    
                     string oldName = job.Name;
 
                     _view.ConfigureJob(job);
@@ -99,15 +128,19 @@ namespace EasySave.ConsoleApp
                     _view.DisplayMessage("ConfigSuccess", job.Name);
                 }
 
-                _view.DisplayMessage("JobStart", job.Name);
-                try
+
+                if (execute)
                 {
-                    await _engine.ExecuteJobAsync(job);
-                    _view.DisplayMessage("JobEnd", job.Name);
-                }
-                catch (Exception ex)
-                {
-                    _view.DisplayMessage("JobError", job.Name, ex.Message);
+                    _view.DisplayMessage("JobStart", job.Name);
+                    try
+                    {
+                        await _engine.ExecuteJobAsync(job);
+                        _view.DisplayMessage("JobEnd", job.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        _view.DisplayMessage("JobError", job.Name, ex.Message);
+                    }
                 }
             }
         }
