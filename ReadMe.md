@@ -1,83 +1,80 @@
-﻿# EasySave - Version 1.0
+﻿# Documentation EasySave - Version 1.0
 
-EasySave est une application console logicielle de sauvegarde de données, développée en C# sur le framework .NET 8.0. Ce projet a été conçu en respectant une architecture Modèle-Vue-Contrôleur (MVC) stricte, garantissant une séparation claire entre la logique métier, la gestion des données et l'interface utilisateur.
+EasySave est une application console logicielle de sauvegarde de données, développée en C# sur le framework .NET 8.0. Ce projet a été conçu en respectant une architecture Modèle-Vue-Contrôleur (MVC), garantissant une séparation claire entre la logique métier, la gestion des données et l'interface utilisateur.
 
 ## Fonctionnalités Principales
 
-* **Gestion de 5 travaux de sauvegarde :** Configuration, mémorisation et exécution de 5 emplacements (slots) distincts.
+* **Gestion des travaux de sauvegarde :** Configuration, mémorisation et exécution de 5 emplacements (slots) distincts.
 * **Types de sauvegarde :**
-  * *Complète :* Copie intégrale du répertoire source.
-  * *Différentielle :* Copie uniquement des fichiers modifiés ou nouveaux par rapport à la cible.
+  * *Complète :* Copie intégrale du répertoire source vers le répertoire cible.
+  * *Différentielle :* Copie exclusive des fichiers modifiés ou nouveaux par rapport à la cible.
 * **Support Multilingue :** Sélection de la langue (Anglais / Français) au démarrage de l'application.
 * **Modes d'exécution :**
-  * *Mode Interactif :* Menu textuel permettant de configurer des travaux et de sélectionner les sauvegardes à lancer.
-  * *Ligne de commande (CLI) :* Exécution directe via des arguments (ex: `1`, `1-3`, `1;5`).
-* **Suivi et Journalisation (Dossier `/data`) :**
-  * `state.json` : Fichier mis à jour en temps réel (fichiers restants, progression en %).
+  * *Mode Interactif :* Menu textuel permettant de configurer les travaux et de sélectionner les sauvegardes à lancer.
+  * *Ligne de commande (CLI) :* Exécution directe via des arguments (ex. : `1`, `1-3`, `1;5`).
+* **Suivi et Journalisation :**
+  * `state.json` : Fichier mis à jour en temps réel contenant l'état des sauvegardes (fichiers restants, progression en %).
   * `config.json` : Sauvegarde persistante de la configuration des travaux.
   * `logs/YYYY-MM-DD.json` : Journalisation quotidienne des opérations de transfert et des temps d'exécution.
 
-## Architecture du Projet (MVC)
+## Architecture du Projet
 
-Le projet est organisé selon les espaces de noms suivants pour préparer la transition vers une future interface graphique (MVVM) :
+Le code source est organisé selon les espaces de noms suivants :
 
-* **`EasySave.Models` :** Contient les structures de données passives (`BackupJob`, `BackupType`, `LogEntry`) et la classe de journalisation (`DailyLogger`).
-* **`EasySave.Views` :** Gère exclusivement les entrées/sorties avec l'utilisateur via la console (`ConsoleView`).
-* **`EasySave.ViewModels` (Contrôleurs) :** Pilote la logique de l'application.
+* **`EasySave.Models` :** Contient les structures de données passives (`BackupJob`, `BackupType`).
+* **`EasySave.Views` :** Gère exclusivement les interactions et l'affichage dans la console (`ConsoleView`).
+* **`EasySave.Controller` :** Pilote la logique applicative.
   * `BackupEngine` : Moteur gérant les algorithmes de copie complète et différentielle.
-  * `ConfigManager` : Gère la persistance de la configuration.
-  * `StateTracker` : Maintient et actualise l'état en temps réel.
-* **`EasySave.Core` :** Outils transverses, incluant le gestionnaire de traduction (`LanguageManager`).
+  * `ConfigManager` : Gère le chargement et la persistance de la configuration.
+  * `StateTracker` : Maintient et actualise l'état des sauvegardes en temps réel.
+* **`EasySave.Core` :** Regroupe les outils transverses, incluant le gestionnaire de traduction (`LanguageManager`).
+* **`EasyLog` :** Module dédié à la journalisation quotidienne (`DailyLogger`, `LogEntry`).
 
 ## Prérequis
 
 * SDK .NET 8.0 ou supérieur.
-* Visual Studio 2022 (recommandé) ou Visual Studio Code.
+* Environnement de développement compatible (Visual Studio 2022 ou Visual Studio Code recommandés).
 
 ## Installation et Compilation
 
-1. Cloner le dépôt Git :
-   ```bash
-   git clone [URL_DU_DEPOT]
-   ```
-2. Accéder au répertoire du projet :
-   ```bash
-   cd EasySave
-   ```
-3. Compiler le projet :
-   ```bash
-   dotnet build
-   ```
+Pour récupérer et compiler le projet, il est recommandé d'exécuter les commandes suivantes dans un terminal :
+
+```bash
+git clone [URL_DU_DEPOT]
+cd EasySave
+dotnet build
+```
 
 ## Utilisation
 
-Le programme peut être lancé de deux manières depuis le terminal.
+Il est possible de lancer le programme de deux manières.
 
 ### 1. Mode Interactif (Menu)
-Lancez l'exécutable sans argument. L'application vous demandera de choisir la langue, puis affichera le menu de configuration et d'exécution. Si un emplacement sélectionné est vide, l'application proposera de le configurer interactivement.
+Une exécution sans argument permet de lancer l'interface utilisateur. Le programme demandera la sélection de la langue, puis affichera le menu principal. Si un emplacement de sauvegarde sélectionné est vide, une configuration interactive sera proposée.
+
 ```bash
-dotnet run
+.\EasySave.exe
 ```
 
 ### 2. Mode Ligne de Commande (CLI)
-Passez les identifiants des travaux à exécuter en argument. L'application sélectionnera la langue par défaut (Anglais) ou demandera la langue, puis exécutera directement les travaux sans afficher le menu.
+Il est possible de fournir les identifiants des travaux à exécuter directement en tant qu'arguments. L'application exécutera alors les travaux spécifiés de manière séquentielle.
 
 * **Exécuter un seul travail :**
   ```bash
-  dotnet run "2"
+  .\EasySave.exe "2"
   ```
 * **Exécuter une plage de travaux consécutifs :**
   ```bash
-  dotnet run "1-3"
+  .\EasySave.exe "1-3"
   ```
 * **Exécuter des travaux spécifiques :**
   ```bash
-  dotnet run "1;4;5"
+  .\EasySave.exe "1;4;5"
   ```
 
 ## Emplacement des Fichiers de Données
 
-Afin de respecter les contraintes de déploiement serveur, aucun chemin n'est codé en dur (comme `C:\temp\`). Tous les fichiers générés par l'application sont stockés dans un sous-dossier `data` situé au même niveau que le fichier exécutable (`.exe`).
+Pour éviter l'utilisation de chemins codés en dur, tous les fichiers générés et utilisés par l'application sont stockés dans un sous-dossier `data` créé automatiquement au même niveau que le fichier exécutable.
 
 ```text
 [Dossier_Executable]/
