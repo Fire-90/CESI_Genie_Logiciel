@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.37111.16 d17.14
+VisualStudioVersion = 17.14.37111.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasySave", "EasySave\EasySave.csproj", "{23933535-B147-48B3-8EBE-2B1A6A23434B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyLog", "EasyLog\EasyLog.csproj", "{8785F0A4-E068-404F-8514-83190F2DA275}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{23933535-B147-48B3-8EBE-2B1A6A23434B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{23933535-B147-48B3-8EBE-2B1A6A23434B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{23933535-B147-48B3-8EBE-2B1A6A23434B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8785F0A4-E068-404F-8514-83190F2DA275}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8785F0A4-E068-404F-8514-83190F2DA275}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8785F0A4-E068-404F-8514-83190F2DA275}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8785F0A4-E068-404F-8514-83190F2DA275}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
