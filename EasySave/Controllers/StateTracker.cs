@@ -26,6 +26,10 @@ namespace EasySave.Controller
         public int NbFilesLeftToDo { get; set; }
         [JsonPropertyName("Progression")]
         public int Progression { get; set; }
+        [JsonPropertyName("LastActionDate")]
+        public string LastActionDate { get; set; }
+        [JsonPropertyName("RemainingFilesSize")]
+        public long RemainingFilesSize { get; set; }
     }
 
     public class StateTracker
@@ -57,7 +61,9 @@ namespace EasySave.Controller
                     TotalFilesToCopy = 0,
                     TotalFilesSize = 0,
                     NbFilesLeftToDo = 0,
-                    Progression = 0
+                    Progression = 0,
+                    LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"),
+                    RemainingFilesSize = 0
                 });
             }
             WriteAllStates();

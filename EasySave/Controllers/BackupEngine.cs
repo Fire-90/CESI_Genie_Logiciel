@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using EasySave.Models;
+using EasyLog;
 
 namespace EasySave.Controller
 {
