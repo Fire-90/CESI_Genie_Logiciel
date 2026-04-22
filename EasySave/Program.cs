@@ -52,9 +52,32 @@ namespace EasySave.ConsoleApp
 
                 if (string.IsNullOrWhiteSpace(input)) continue;
 
-                if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase))
+                if (input.Trim().Equals("Q", StringComparison.OrdinalIgnoreCase)) 
                 {
                     exit = true;
+                }
+                else if (input.Trim().Equals("E", StringComparison.OrdinalIgnoreCase))
+                {
+                    _view.DisplayMessage("ChooseEditConfig");
+                    string editId = _view.ReadInput();
+                    if (string.IsNullOrWhiteSpace(editId)) continue;
+                    List<int> idsToExecute = ParseArgs(editId);
+                    await ExecuteJobsAsync(idsToExecute);
+
+                }
+                else if (input.Trim().Equals("D", StringComparison.OrdinalIgnoreCase))
+                {
+                    _view.DisplayMessage("ChooseDeleteConfig");
+                    string deleteInput = _view.ReadInput();
+                    if (int.TryParse(deleteInput, out int deleteId))
+                    {
+                        _configManager.DeleteConfig(deleteId);
+                        _view.DisplayMessage("DeleteSuccess");
+                    }
+                    else
+                    {
+                        _view.DisplayMessage("InvalidDeleteInput");
+                    }
                 }
                 else
                 {

@@ -47,6 +47,8 @@ namespace EasySave.Views
 
             Console.WriteLine(LanguageManager.GetString("OptionsTitle"));
             Console.WriteLine(LanguageManager.GetString("OptionExecute"));
+            Console.WriteLine(LanguageManager.GetString("OptionEdit"));
+            Console.WriteLine(LanguageManager.GetString("OptionDelete"));
             Console.WriteLine(LanguageManager.GetString("OptionQuit"));
             Console.Write(LanguageManager.GetString("YourChoice"));
         }

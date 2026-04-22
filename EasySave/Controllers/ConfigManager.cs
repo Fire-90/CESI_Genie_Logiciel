@@ -41,6 +41,21 @@ namespace EasySave.ViewModels
             return defaultJobs;
         }
 
+        public void DeleteConfig(int jobId)
+        {
+            var jobs = LoadConfig();
+            var job = jobs.Find(j => j.Id == jobId);
+            if (job != null)
+            {
+                job.Name = $"Save{jobId}";
+                job.SourceDirectory = "";
+                job.TargetDirectory = "";
+                job.Type = BackupType.Full;
+                SaveConfig(jobs);
+            }
+
+        }
+
         public void SaveConfig(List<BackupJob> jobs)
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
