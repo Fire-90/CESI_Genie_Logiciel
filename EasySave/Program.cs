@@ -101,7 +101,7 @@ namespace EasySave.ConsoleApp
             }
         }
 
-        private static async Task ExecuteJobsAsync(List<int> ids, bool exucute)
+        private static async Task ExecuteJobsAsync(List<int> ids, bool execute)
         {
             foreach (var id in ids)
             {
@@ -114,9 +114,13 @@ namespace EasySave.ConsoleApp
                     continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(job.SourceDirectory))
+                if (string.IsNullOrWhiteSpace(job.SourceDirectory) || !execute)
                 {
-                    _view.DisplayMessage("SlotEmpty", job.Id);
+                    if (execute)
+                    {
+                        _view.DisplayMessage("SlotEmpty", job.Id);
+                    }
+                    
                     string oldName = job.Name;
 
                     _view.ConfigureJob(job);
@@ -127,7 +131,8 @@ namespace EasySave.ConsoleApp
                     _view.DisplayMessage("ConfigSuccess", job.Name);
                 }
 
-                if (exucute)
+
+                if (execute)
                 {
                     _view.DisplayMessage("JobStart", job.Name);
                     try
@@ -140,7 +145,6 @@ namespace EasySave.ConsoleApp
                         _view.DisplayMessage("JobError", job.Name, ex.Message);
                     }
                 }
-
             }
         }
 
