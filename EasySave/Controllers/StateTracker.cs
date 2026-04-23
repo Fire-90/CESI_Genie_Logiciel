@@ -77,6 +77,7 @@ namespace EasySave.Controller
                 if (state != null)
                 {
                     updateAction(state);
+                    state.LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                     WriteAllStates();
                 }
             }

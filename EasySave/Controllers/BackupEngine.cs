@@ -42,6 +42,7 @@ namespace EasySave.Controller
                 s.TotalFilesToCopy = totalFilesToCopy;
                 s.TotalFilesSize = totalFilesSize;
                 s.NbFilesLeftToDo = totalFilesToCopy;
+                s.RemainingFilesSize = totalFilesSize;
                 s.Progression = 0;
             });
 
@@ -78,6 +79,7 @@ namespace EasySave.Controller
                         _stateTracker.UpdateState(job.Name, s =>
                         {
                             s.NbFilesLeftToDo--;
+                            s.RemainingFilesSize -= sourceFileInfo.Length;
                             s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
                         });
                     }
@@ -113,6 +115,7 @@ namespace EasySave.Controller
                 _stateTracker.UpdateState(jobName, s =>
                 {
                     s.NbFilesLeftToDo--;
+                    s.RemainingFilesSize -= fileSize;
                     s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
                 });
 
