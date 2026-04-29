@@ -4,7 +4,7 @@ using System.IO;
 using System.Text.Json;
 using EasySave.Models;
 
-namespace EasySave.Controller
+namespace EasySave.Services
 {
     public class ConfigManager
     {
