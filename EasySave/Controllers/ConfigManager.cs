@@ -6,6 +6,13 @@ using EasySave.Models;
 
 namespace EasySave.Controller
 {
+    // Nouvelle classe pour englober toute la configuration
+    public class AppSettings
+    {
+        public string LogFormat { get; set; } = "json";
+        public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
+    }
+
     public class ConfigManager
     {
         private readonly string _configFilePath;
@@ -18,33 +25,42 @@ namespace EasySave.Controller
             _configFilePath = Path.Combine(dataPath, "config.json");
         }
 
-        public List<BackupJob> LoadConfig()
+        public AppSettings LoadConfig()
         {
             if (!File.Exists(_configFilePath))
             {
                 return CreateDefaultConfig();
             }
 
-            string json = File.ReadAllText(_configFilePath);
-            return JsonSerializer.Deserialize<List<BackupJob>>(json) ?? CreateDefaultConfig();
+            try
+            {
+                string json = File.ReadAllText(_configFilePath);
+                // On tente de désérialiser vers le nouveau format
+                return JsonSerializer.Deserialize<AppSettings>(json) ?? CreateDefaultConfig();
+            }
+            catch (JsonException)
+            {
+                // Si l'ancien fichier config.json ne contenait qu'un tableau, 
+                // cette exception permet de recréer une configuration propre.
+                return CreateDefaultConfig();
+            }
         }
 
-        private List<BackupJob> CreateDefaultConfig()
+        private AppSettings CreateDefaultConfig()
         {
-            var defaultJobs = new List<BackupJob>();
+            var settings = new AppSettings();
             for (int i = 1; i <= 5; i++)
             {
-                // Création de 5 emplacements vides par défaut
-                defaultJobs.Add(new BackupJob(i, $"Save{i}", "", "", BackupType.Full));
+                settings.Jobs.Add(new BackupJob(i, $"Save{i}", "", "", BackupType.Full));
             }
-            SaveConfig(defaultJobs);
-            return defaultJobs;
+            SaveConfig(settings);
+            return settings;
         }
 
-        public void SaveConfig(List<BackupJob> jobs)
+        public void SaveConfig(AppSettings settings)
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(jobs, options);
+            string json = JsonSerializer.Serialize(settings, options);
             File.WriteAllText(_configFilePath, json);
         }
     }

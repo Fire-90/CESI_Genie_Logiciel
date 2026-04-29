@@ -4,9 +4,12 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 namespace EasyLog
 {
+    // L'attribut est ajouté pour s'assurer que la classe est publique et sérialisable en XML
+    [Serializable]
     public class LogEntry
     {
         [JsonPropertyName("Name")]
@@ -33,6 +36,9 @@ namespace EasyLog
         private static readonly Lazy<DailyLogger> _instance = new Lazy<DailyLogger>(() => new DailyLogger());
         public static DailyLogger Instance => _instance.Value;
 
+        // Propriété définissant le format (assignée depuis Program.cs)
+        public string LogFormat { get; set; } = "json";
+
         private readonly string _logDirectory;
         private static readonly object _lockObj = new object();
 
@@ -49,36 +55,73 @@ namespace EasyLog
 
         public async Task WriteLogAsync(LogEntry entry)
         {
-            string fileName = $"{DateTime.Now:yyyy-MM-dd}.json";
-            string filePath = Path.Combine(_logDirectory, fileName);
-
             lock (_lockObj)
             {
-                List<LogEntry> logs = new List<LogEntry>();
-
-                // Lecture du fichier existant pour conserver un tableau JSON valide
-                if (File.Exists(filePath))
+                if (LogFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
                 {
-                    try
-                    {
-                        string existingJson = File.ReadAllText(filePath);
-                        if (!string.IsNullOrWhiteSpace(existingJson))
-                        {
-                            logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
-                        }
-                    }
-                    catch (JsonException) { /* Fichier ignoré si corrompu */ }
+                    WriteXmlLog(entry);
                 }
-
-                logs.Add(entry);
-
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                string jsonString = JsonSerializer.Serialize(logs, options);
-
-                File.WriteAllText(filePath, jsonString);
+                else
+                {
+                    WriteJsonLog(entry);
+                }
             }
 
             await Task.CompletedTask;
+        }
+
+        private void WriteJsonLog(LogEntry entry)
+        {
+            string fileName = $"{DateTime.Now:yyyy-MM-dd}.json";
+            string filePath = Path.Combine(_logDirectory, fileName);
+            List<LogEntry> logs = new List<LogEntry>();
+
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    string existingJson = File.ReadAllText(filePath);
+                    if (!string.IsNullOrWhiteSpace(existingJson))
+                    {
+                        logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
+                    }
+                }
+                catch (JsonException) { /* Fichier ignoré si corrompu */ }
+            }
+
+            logs.Add(entry);
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string jsonString = JsonSerializer.Serialize(logs, options);
+
+            File.WriteAllText(filePath, jsonString);
+        }
+
+        private void WriteXmlLog(LogEntry entry)
+        {
+            string fileName = $"{DateTime.Now:yyyy-MM-dd}.xml";
+            string filePath = Path.Combine(_logDirectory, fileName);
+            List<LogEntry> logs = new List<LogEntry>();
+            XmlSerializer serializer = new XmlSerializer(typeof(List<LogEntry>));
+
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    using (FileStream fs = new FileStream(filePath, FileMode.Open))
+                    {
+                        logs = (List<LogEntry>)serializer.Deserialize(fs);
+                    }
+                }
+                catch (InvalidOperationException) { /* Fichier ignoré si corrompu */ }
+            }
+
+            logs.Add(entry);
+
+            using (FileStream fs = new FileStream(filePath, FileMode.Create))
+            {
+                serializer.Serialize(fs, logs);
+            }
         }
     }
 }
