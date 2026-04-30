@@ -16,6 +16,7 @@ namespace EasySave.ViewModels
         private readonly BackupEngine _backupEngine;
         private readonly StateTracker _stateTracker;
 
+        // --- PROPRIÉTÉS DES TRAVAUX ---
         public ObservableCollection<JobViewModel> Jobs { get; }
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
 
@@ -30,7 +31,6 @@ namespace EasySave.ViewModels
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
 
-                    // On met à jour l'état (grisé ou non) des boutons qui dépendent de la sélection
                     (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
                     (DeleteJobCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
@@ -58,11 +58,37 @@ namespace EasySave.ViewModels
             set { _uiStrings = value; OnPropertyChanged(nameof(UIStrings)); }
         }
 
+        // --- PROPRIÉTÉS DES PARAMÈTRES (NOUVEAU) ---
+        public AppSettings CurrentSettings { get; private set; }
+        public ObservableCollection<string> Softwares { get; set; }
+
+        private bool _isSettingsOpen = false;
+        public bool IsSettingsOpen
+        {
+            get => _isSettingsOpen;
+            set { _isSettingsOpen = value; OnPropertyChanged(nameof(IsSettingsOpen)); }
+        }
+
+        private string _newSoftware;
+        public string NewSoftware
+        {
+            get => _newSoftware;
+            set { _newSoftware = value; OnPropertyChanged(nameof(NewSoftware)); }
+        }
+
+        public string SelectedSoftware { get; set; }
+
         // --- COMMANDES ---
         public ICommand AddJobCommand { get; }
         public ICommand ExecuteSelectionCommand { get; }
         public ICommand DeleteJobCommand { get; }
         public ICommand ChangeLanguageCommand { get; }
+
+        // Commandes des paramètres (NOUVEAU)
+        public ICommand ToggleSettingsCommand { get; }
+        public ICommand AddSoftwareCommand { get; }
+        public ICommand RemoveSoftwareCommand { get; }
+        public ICommand SaveSettingsCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine)
         {
@@ -70,22 +96,54 @@ namespace EasySave.ViewModels
             _stateTracker = stateTracker;
             _backupEngine = backupEngine;
 
+            // Chargement des travaux
             var loadedJobs = _configManager.LoadConfig();
             Jobs = new ObservableCollection<JobViewModel>(loadedJobs.Select(j => new JobViewModel(j)));
 
+            // Chargement des paramètres (NOUVEAU)
+            CurrentSettings = _configManager.LoadSettings();
+            Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
+
             _backupEngine.OnProgressUpdate += (file, remaining) => { CurrentFile = file; };
 
+            // Initialisation des commandes des travaux
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
 
-            ChangeLanguage("FR");
+            // Initialisation des commandes des paramètres (NOUVEAU)
+            ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
+
+            AddSoftwareCommand = new RelayCommand(p =>
+            {
+                if (!string.IsNullOrWhiteSpace(NewSoftware) && !Softwares.Contains(NewSoftware))
+                {
+                    Softwares.Add(NewSoftware);
+                    NewSoftware = "";
+                }
+            });
+
+            RemoveSoftwareCommand = new RelayCommand(p =>
+            {
+                if (SelectedSoftware != null) Softwares.Remove(SelectedSoftware);
+            });
+
+            SaveSettingsCommand = new RelayCommand(SaveSettings);
+
+            // Applique la langue sauvegardée au lieu de forcer "FR"
+            ChangeLanguage(CurrentSettings.Language);
         }
 
+        // --- GESTION DE LA LANGUE ET PARAMÈTRES ---
         private void ChangeLanguage(object param)
         {
-            string lang = param as string;
+            string lang = param as string ?? "FR";
+
+            // On sauvegarde le choix de langue dynamiquement
+            CurrentSettings.Language = lang;
+            _configManager.SaveSettings(CurrentSettings);
+
             if (lang == "EN")
             {
                 UIStrings = new Dictionary<string, string>
@@ -100,7 +158,12 @@ namespace EasySave.ViewModels
                     { "BtnDelete", "🗑 Delete" },
                     { "Recent", "Recent activity:" },
                     { "MsgEmpty", "⚠️ Please fill all empty fields before creating a new job." },
-                    { "MsgDeleted", "🗑️ Job successfully deleted." }
+                    { "MsgDeleted", "🗑️ Job successfully deleted." },
+                    // Nouveaux textes pour les paramètres
+                    { "Settings", "⚙ Settings" },
+                    { "Close", "Close" },
+                    { "SaveSettings", "Save Settings" },
+                    { "Softwares", "Blocking Business Softwares:" }
                 };
             }
             else
@@ -117,9 +180,21 @@ namespace EasySave.ViewModels
                     { "BtnDelete", "🗑 Supprimer" },
                     { "Recent", "Activité récente :" },
                     { "MsgEmpty", "⚠️ Veuillez remplir tous les champs vides avant d'ajouter un nouveau travail." },
-                    { "MsgDeleted", "🗑️ Travail supprimé avec succès." }
+                    { "MsgDeleted", "🗑️ Travail supprimé avec succès." },
+                    // Nouveaux textes pour les paramètres
+                    { "Settings", "⚙ Paramètres" },
+                    { "Close", "Fermer" },
+                    { "SaveSettings", "Enregistrer les paramètres" },
+                    { "Softwares", "Logiciels métier bloquants :" }
                 };
             }
+        }
+
+        private void SaveSettings(object parameter)
+        {
+            CurrentSettings.BusinessSoftwares = Softwares.ToList();
+            _configManager.SaveSettings(CurrentSettings);
+            IsSettingsOpen = false; // Ferme le menu après avoir cliqué sur sauvegarder
         }
 
         // --- LOGIQUE D'AJOUT AVEC VÉRIFICATION ---
@@ -153,15 +228,15 @@ namespace EasySave.ViewModels
             SelectedJob = newViewModel;
         }
 
-        // --- NOUVELLE LOGIQUE DE SUPPRESSION ---
+        // --- LOGIQUE DE SUPPRESSION ---
         private void ExecuteDeleteJob(object parameter)
         {
             if (SelectedJob != null)
             {
-                Jobs.Remove(SelectedJob); // Retire de la liste visuelle
-                SaveConfig();             // Met à jour le JSON
+                Jobs.Remove(SelectedJob);
+                SaveConfig();
                 CurrentFile = UIStrings["MsgDeleted"];
-                SelectedJob = null;       // Désélectionne pour griser les boutons
+                SelectedJob = null;
             }
         }
 
@@ -183,7 +258,7 @@ namespace EasySave.ViewModels
             }
         }
 
-        // Pour le terminal (.\Graphic.exe "1-2")
+        // --- POUR LE TERMINAL (.\Graphic.exe "1-2") ---
         public async Task ExecuteJobsAsync(List<int> ids)
         {
             try

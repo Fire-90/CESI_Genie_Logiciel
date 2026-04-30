@@ -15,29 +15,35 @@ namespace EasySave.Services
 
         private StateTracker _stateTracker;
 
-        // Nom du processus métier à surveiller (sans le .exe). 
-        // Note : "calculator" est l'application calculatrice standard de Windows
-        private readonly string _businessSoftwareName = "calculator";
+        // NOUVEAU : Une liste des logiciels métier à surveiller (sans le .exe)
+        private readonly string[] _businessSoftwares = { "calculatorapp", "notepad" };
 
         public BackupEngine(StateTracker stateTracker)
         {
             _stateTracker = stateTracker;
         }
 
-        // --- MÉTHODE DE DÉTECTION ---
-        private bool IsBusinessSoftwareRunning()
+        // --- NOUVELLE MÉTHODE DE DÉTECTION ---
+        private string GetRunningBusinessSoftware()
         {
-            // Vérifie dans les processus Windows si le logiciel métier est en cours d'exécution
-            Process[] processes = Process.GetProcessesByName(_businessSoftwareName);
-            return processes.Length > 0;
+            foreach (string software in _businessSoftwares)
+            {
+                Process[] processes = Process.GetProcessesByName(software);
+                if (processes.Length > 0)
+                {
+                    return software;
+                }
+            }
+            return null;
         }
 
         public async Task ExecuteJobAsync(BackupJob job)
         {
             // 1. Vérification AVANT de lancer le travail
-            if (IsBusinessSoftwareRunning())
+            string blockingSoftware = GetRunningBusinessSoftware();
+            if (blockingSoftware != null)
             {
-                throw new Exception($"Lancement impossible : Le logiciel métier '{_businessSoftwareName}' est en cours d'exécution.");
+                throw new Exception($"Lancement impossible : Le logiciel métier '{blockingSoftware}' est ouvert.");
             }
 
             if (string.IsNullOrWhiteSpace(job.SourceDirectory) || !Directory.Exists(job.SourceDirectory))
@@ -85,12 +91,12 @@ namespace EasySave.Services
 
             foreach (string file in Directory.GetFiles(sourceDir))
             {
-                // 2. Vérification PENDANT le travail (avant de traiter le prochain fichier)
-                if (IsBusinessSoftwareRunning())
+                // 2. Vérification PENDANT le travail (avant de copier le prochain fichier)
+                string blockingSoftware = GetRunningBusinessSoftware();
+                if (blockingSoftware != null)
                 {
-                    // Le cahier des charges dit : "Dans le cas de travaux séquentiels, le logiciel doit terminer la sauvegarde du fichier en cours."
-                    // On lance donc une exception pour casser la boucle proprement.
-                    throw new Exception($"Sauvegarde interrompue : Détection du logiciel métier '{_businessSoftwareName}'.");
+                    // L'exception arrête la boucle, mais le fichier précédent a eu le temps de finir sa copie
+                    throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{blockingSoftware}'.");
                 }
 
                 string targetFile = Path.Combine(targetDir, Path.GetFileName(file));
@@ -135,9 +141,7 @@ namespace EasySave.Services
             try
             {
                 stopwatch.Start();
-
                 File.Copy(source, target, true);
-
                 stopwatch.Stop();
                 timeMs = stopwatch.ElapsedMilliseconds;
 
