@@ -1,4 +1,4 @@
-﻿<Window x:Class="Graphique.MainWindow"
+﻿<Window x:Class="Graphic.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding UIStrings[Title]}" Height="600" Width="950" MinHeight="550" MinWidth="850"
@@ -31,7 +31,7 @@
         <DataGrid Grid.Row="1" ItemsSource="{Binding Jobs}" 
                   SelectedItem="{Binding SelectedJob}" 
                   AutoGenerateColumns="False" 
-                  CanUserAddRows="False" SelectionMode="Single" IsReadOnly="False"
+                  CanUserAddRows="False" SelectionMode="Single" IsReadOnly="True"
                   GridLinesVisibility="None" RowHeight="35" HeadersVisibility="Column"
                   AlternatingRowBackground="#E8F1F8" Background="White" BorderBrush="#BDC3C7" BorderThickness="1">
 
@@ -129,8 +129,12 @@
                 <TextBlock Text="{Binding CurrentFile}" FontStyle="Italic" TextTrimming="CharacterEllipsis" Foreground="#34495E"/>
             </StackPanel>
 
+            <!-- VOICI LA PARTIE CORRIGÉE : Un seul StackPanel avec les 3 boutons -->
             <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="{Binding UIStrings[BtnAdd]}" Command="{Binding AddJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+
+                <Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding DeleteJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+
                 <Button Content="{Binding UIStrings[BtnRun]}" Command="{Binding ExecuteSelectionCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
             </StackPanel>
         </Grid>

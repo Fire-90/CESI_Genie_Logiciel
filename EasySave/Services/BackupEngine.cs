@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using EasySave.Models;
 using EasyLog;
@@ -14,13 +15,31 @@ namespace EasySave.Services
 
         private StateTracker _stateTracker;
 
+        // Nom du processus métier à surveiller (sans le .exe). 
+        // Note : "calculator" est l'application calculatrice standard de Windows
+        private readonly string _businessSoftwareName = "calculator";
+
         public BackupEngine(StateTracker stateTracker)
         {
             _stateTracker = stateTracker;
         }
 
+        // --- MÉTHODE DE DÉTECTION ---
+        private bool IsBusinessSoftwareRunning()
+        {
+            // Vérifie dans les processus Windows si le logiciel métier est en cours d'exécution
+            Process[] processes = Process.GetProcessesByName(_businessSoftwareName);
+            return processes.Length > 0;
+        }
+
         public async Task ExecuteJobAsync(BackupJob job)
         {
+            // 1. Vérification AVANT de lancer le travail
+            if (IsBusinessSoftwareRunning())
+            {
+                throw new Exception($"Lancement impossible : Le logiciel métier '{_businessSoftwareName}' est en cours d'exécution.");
+            }
+
             if (string.IsNullOrWhiteSpace(job.SourceDirectory) || !Directory.Exists(job.SourceDirectory))
             {
                 throw new DirectoryNotFoundException($"Source invalide ou introuvable pour {job.Name}");
@@ -66,6 +85,14 @@ namespace EasySave.Services
 
             foreach (string file in Directory.GetFiles(sourceDir))
             {
+                // 2. Vérification PENDANT le travail (avant de traiter le prochain fichier)
+                if (IsBusinessSoftwareRunning())
+                {
+                    // Le cahier des charges dit : "Dans le cas de travaux séquentiels, le logiciel doit terminer la sauvegarde du fichier en cours."
+                    // On lance donc une exception pour casser la boucle proprement.
+                    throw new Exception($"Sauvegarde interrompue : Détection du logiciel métier '{_businessSoftwareName}'.");
+                }
+
                 string targetFile = Path.Combine(targetDir, Path.GetFileName(file));
                 bool shouldCopy = true;
 
@@ -108,7 +135,9 @@ namespace EasySave.Services
             try
             {
                 stopwatch.Start();
+
                 File.Copy(source, target, true);
+
                 stopwatch.Stop();
                 timeMs = stopwatch.ElapsedMilliseconds;
 
@@ -119,7 +148,7 @@ namespace EasySave.Services
                     s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
                 });
 
-                OnProgressUpdate?.Invoke(source, 0); // Event optionnel
+                OnProgressUpdate?.Invoke(source, 0);
             }
             catch (Exception)
             {

@@ -17,11 +17,8 @@ namespace EasySave.ViewModels
         private readonly StateTracker _stateTracker;
 
         public ObservableCollection<JobViewModel> Jobs { get; }
-
-        // Liste pour alimenter la liste déroulante "Type"
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
 
-        // --- GESTION DE LA SÉLECTION ---
         private JobViewModel _selectedJob;
         public JobViewModel SelectedJob
         {
@@ -32,7 +29,10 @@ namespace EasySave.ViewModels
                 {
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
+
+                    // On met à jour l'état (grisé ou non) des boutons qui dépendent de la sélection
                     (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                    (DeleteJobCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
         }
@@ -51,21 +51,17 @@ namespace EasySave.ViewModels
             }
         }
 
-        // --- SYSTÈME DE LANGUES (I18N) ---
         private Dictionary<string, string> _uiStrings;
         public Dictionary<string, string> UIStrings
         {
             get => _uiStrings;
-            set
-            {
-                _uiStrings = value;
-                OnPropertyChanged(nameof(UIStrings));
-            }
+            set { _uiStrings = value; OnPropertyChanged(nameof(UIStrings)); }
         }
 
         // --- COMMANDES ---
         public ICommand AddJobCommand { get; }
         public ICommand ExecuteSelectionCommand { get; }
+        public ICommand DeleteJobCommand { get; }
         public ICommand ChangeLanguageCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine)
@@ -81,13 +77,11 @@ namespace EasySave.ViewModels
 
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
+            DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
 
-            // Charger le français par défaut
             ChangeLanguage("FR");
         }
-
-        // --- LOGIQUE DES COMMANDES ---
 
         private void ChangeLanguage(object param)
         {
@@ -103,10 +97,13 @@ namespace EasySave.ViewModels
                     { "LblType", "Backup Type" },
                     { "BtnAdd", "+ Add a job" },
                     { "BtnRun", "▶ Execute selection" },
-                    { "Recent", "Recent activity:" }
+                    { "BtnDelete", "🗑 Delete" },
+                    { "Recent", "Recent activity:" },
+                    { "MsgEmpty", "⚠️ Please fill all empty fields before creating a new job." },
+                    { "MsgDeleted", "🗑️ Job successfully deleted." }
                 };
             }
-            else // FR par défaut
+            else
             {
                 UIStrings = new Dictionary<string, string>
                 {
@@ -117,13 +114,28 @@ namespace EasySave.ViewModels
                     { "LblType", "Type de sauvegarde" },
                     { "BtnAdd", "+ Ajouter un travail" },
                     { "BtnRun", "▶ Lancer la sélection" },
-                    { "Recent", "Activité récente :" }
+                    { "BtnDelete", "🗑 Supprimer" },
+                    { "Recent", "Activité récente :" },
+                    { "MsgEmpty", "⚠️ Veuillez remplir tous les champs vides avant d'ajouter un nouveau travail." },
+                    { "MsgDeleted", "🗑️ Travail supprimé avec succès." }
                 };
             }
         }
 
+        // --- LOGIQUE D'AJOUT AVEC VÉRIFICATION ---
         private void ExecuteAddJob(object parameter)
         {
+            bool hasEmptyFields = Jobs.Any(j =>
+                string.IsNullOrWhiteSpace(j.Name) ||
+                string.IsNullOrWhiteSpace(j.SourceDirectory) ||
+                string.IsNullOrWhiteSpace(j.TargetDirectory));
+
+            if (hasEmptyFields)
+            {
+                CurrentFile = UIStrings["MsgEmpty"];
+                return;
+            }
+
             int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1;
             var newModel = new BackupJob
             {
@@ -138,8 +150,19 @@ namespace EasySave.ViewModels
             Jobs.Add(newViewModel);
             SaveConfig();
 
-            // Sélectionner automatiquement le nouveau travail pour que l'utilisateur puisse le modifier en bas !
             SelectedJob = newViewModel;
+        }
+
+        // --- NOUVELLE LOGIQUE DE SUPPRESSION ---
+        private void ExecuteDeleteJob(object parameter)
+        {
+            if (SelectedJob != null)
+            {
+                Jobs.Remove(SelectedJob); // Retire de la liste visuelle
+                SaveConfig();             // Met à jour le JSON
+                CurrentFile = UIStrings["MsgDeleted"];
+                SelectedJob = null;       // Désélectionne pour griser les boutons
+            }
         }
 
         private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
@@ -147,20 +170,40 @@ namespace EasySave.ViewModels
         private async void ExecuteSelectedJob(object parameter)
         {
             if (SelectedJob == null || string.IsNullOrWhiteSpace(SelectedJob.SourceDirectory)) return;
-            try { await _backupEngine.ExecuteJobAsync(SelectedJob.Model); }
-            catch (Exception ex) { Console.WriteLine($"Erreur : {ex.Message}"); }
+
+            try
+            {
+                CurrentFile = "⏳ Démarrage de la sauvegarde...";
+                await _backupEngine.ExecuteJobAsync(SelectedJob.Model);
+                CurrentFile = "✅ Sauvegarde terminée avec succès !";
+            }
+            catch (Exception ex)
+            {
+                CurrentFile = $"❌ Erreur : {ex.Message}";
+            }
+        }
+
+        // Pour le terminal (.\Graphic.exe "1-2")
+        public async Task ExecuteJobsAsync(List<int> ids)
+        {
+            try
+            {
+                CurrentFile = "⏳ Démarrage des sauvegardes demandées...";
+                foreach (var id in ids)
+                {
+                    var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
+                    if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory)) continue;
+                    await _backupEngine.ExecuteJobAsync(jobVm.Model);
+                }
+                CurrentFile = "✅ Toutes les sauvegardes sont terminées avec succès !";
+            }
+            catch (Exception ex) { CurrentFile = $"❌ Erreur : {ex.Message}"; }
         }
 
         public void SaveConfig()
         {
             var models = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveConfig(models);
-        }
-
-        public void UpdateJobName(string oldName, string newName)
-        {
-            var vm = Jobs.FirstOrDefault(j => j.Name == oldName);
-            if (vm != null) { vm.Name = newName; SaveConfig(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

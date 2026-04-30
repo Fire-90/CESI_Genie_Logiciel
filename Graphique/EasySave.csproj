@@ -9,7 +9,7 @@
   </PropertyGroup>
 	
 	<ItemGroup>
-		<ProjectReference Include="..\EasySave\EasySave.csproj" />
+		<ProjectReference Include="..\EasySave\Engine.csproj" />
 	</ItemGroup>
 
 </Project>
