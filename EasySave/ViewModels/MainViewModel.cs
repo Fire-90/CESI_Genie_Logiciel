@@ -1,12 +1,12 @@
-﻿using EasySave.Models;
-using EasySave.Services;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Input; // Requis pour ICommand
+using System.Windows.Input;
+using EasySave.Models;
+using EasySave.Services;
 
 namespace EasySave.ViewModels
 {
@@ -16,10 +16,12 @@ namespace EasySave.ViewModels
         private readonly BackupEngine _backupEngine;
         private readonly StateTracker _stateTracker;
 
-        // Remplacement de List par ObservableCollection pour mettre à jour l'UI automatiquement
         public ObservableCollection<JobViewModel> Jobs { get; }
 
-        // --- GESTION DE LA SÉLECTION DANS LE DATAGRID ---
+        // Liste pour alimenter la liste déroulante "Type"
+        public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
+
+        // --- GESTION DE LA SÉLECTION ---
         private JobViewModel _selectedJob;
         public JobViewModel SelectedJob
         {
@@ -30,8 +32,6 @@ namespace EasySave.ViewModels
                 {
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
-
-                    // NOUVELLE LIGNE : On prévient le bouton qu'il doit revérifier son état (grisé ou non)
                     (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
@@ -51,38 +51,22 @@ namespace EasySave.ViewModels
             }
         }
 
-        // Inputs used when creating a NEW job
-        private string _newSourceDirectory = "";
-        public string NewSourceDirectory
+        // --- SYSTÈME DE LANGUES (I18N) ---
+        private Dictionary<string, string> _uiStrings;
+        public Dictionary<string, string> UIStrings
         {
-            get => _newSourceDirectory;
+            get => _uiStrings;
             set
             {
-                if (_newSourceDirectory != value)
-                {
-                    _newSourceDirectory = value;
-                    OnPropertyChanged(nameof(NewSourceDirectory));
-                }
+                _uiStrings = value;
+                OnPropertyChanged(nameof(UIStrings));
             }
         }
 
-        private string _newTargetDirectory = "";
-        public string NewTargetDirectory
-        {
-            get => _newTargetDirectory;
-            set
-            {
-                if (_newTargetDirectory != value)
-                {
-                    _newTargetDirectory = value;
-                    OnPropertyChanged(nameof(NewTargetDirectory));
-                }
-            }
-        }
-
-        // --- COMMANDES POUR LES BOUTONS DE L'INTERFACE ---
+        // --- COMMANDES ---
         public ICommand AddJobCommand { get; }
         public ICommand ExecuteSelectionCommand { get; }
+        public ICommand ChangeLanguageCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine)
         {
@@ -90,114 +74,81 @@ namespace EasySave.ViewModels
             _stateTracker = stateTracker;
             _backupEngine = backupEngine;
 
-            // Chargement des modèles et initialisation de l'ObservableCollection
             var loadedJobs = _configManager.LoadConfig();
             Jobs = new ObservableCollection<JobViewModel>(loadedJobs.Select(j => new JobViewModel(j)));
 
-            // Subscribe to item property changes so edits to Source/Target are persisted
-            foreach (var jvm in Jobs) jvm.PropertyChanged += Job_PropertyChanged;
-            Jobs.CollectionChanged += (s, e) =>
-            {
-                if (e.NewItems != null)
-                {
-                    foreach (JobViewModel nv in e.NewItems) nv.PropertyChanged += Job_PropertyChanged;
-                }
-                if (e.OldItems != null)
-                {
-                    foreach (JobViewModel ov in e.OldItems) ov.PropertyChanged -= Job_PropertyChanged;
-                }
-            };
+            _backupEngine.OnProgressUpdate += (file, remaining) => { CurrentFile = file; };
 
-            // Abonnement à la progression du moteur
-            _backupEngine.OnProgressUpdate += (file, remaining) =>
-            {
-                CurrentFile = file;
-            };
-
-            // Initialisation des Commandes
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
+            ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
+
+            // Charger le français par défaut
+            ChangeLanguage("FR");
         }
 
-        private void Job_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        // --- LOGIQUE DES COMMANDES ---
+
+        private void ChangeLanguage(object param)
         {
-            // Persist changes when key job properties change (Name, SourceDirectory, TargetDirectory, Type)
-            if (e.PropertyName == nameof(JobViewModel.SourceDirectory) ||
-                e.PropertyName == nameof(JobViewModel.TargetDirectory) ||
-                e.PropertyName == nameof(JobViewModel.Name) ||
-                e.PropertyName == nameof(JobViewModel.Type))
+            string lang = param as string;
+            if (lang == "EN")
             {
-                SaveConfig();
+                UIStrings = new Dictionary<string, string>
+                {
+                    { "Title", "EasySave 2.0 - ProSoft" },
+                    { "LblName", "Name" },
+                    { "LblSource", "Source Folder" },
+                    { "LblTarget", "Target Folder" },
+                    { "LblType", "Backup Type" },
+                    { "BtnAdd", "+ Add a job" },
+                    { "BtnRun", "▶ Execute selection" },
+                    { "Recent", "Recent activity:" }
+                };
+            }
+            else // FR par défaut
+            {
+                UIStrings = new Dictionary<string, string>
+                {
+                    { "Title", "EasySave 2.0 - ProSoft" },
+                    { "LblName", "Nom du travail" },
+                    { "LblSource", "Dossier Source" },
+                    { "LblTarget", "Dossier Cible" },
+                    { "LblType", "Type de sauvegarde" },
+                    { "BtnAdd", "+ Ajouter un travail" },
+                    { "BtnRun", "▶ Lancer la sélection" },
+                    { "Recent", "Activité récente :" }
+                };
             }
         }
 
-        // --- LOGIQUE DES BOUTONS ---
-
         private void ExecuteAddJob(object parameter)
         {
-            // Trouver le plus grand ID et faire +1 (gère les travaux illimités)
             int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1;
-
             var newModel = new BackupJob
             {
                 Id = newId,
-                Name = $"Nouveau Travail {newId}",
-                SourceDirectory = NewSourceDirectory ?? "",
-                TargetDirectory = NewTargetDirectory ?? "",
+                Name = $"Save {newId}",
+                SourceDirectory = "",
+                TargetDirectory = "",
                 Type = BackupType.Full
             };
 
             var newViewModel = new JobViewModel(newModel);
-            newViewModel.PropertyChanged += Job_PropertyChanged;
             Jobs.Add(newViewModel);
-            SaveConfig(); // Sauvegarde immédiate dans le JSON
+            SaveConfig();
 
-            // Clear inputs after creating
-            NewSourceDirectory = "";
-            NewTargetDirectory = "";
+            // Sélectionner automatiquement le nouveau travail pour que l'utilisateur puisse le modifier en bas !
+            SelectedJob = newViewModel;
         }
 
-        private bool CanExecuteSelectedJob(object parameter)
-        {
-            // Le bouton "Lancer" ne sera actif QUE si un travail est sélectionné dans la grille
-            return SelectedJob != null;
-        }
+        private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
 
         private async void ExecuteSelectedJob(object parameter)
         {
-            // Sécurité : on ne lance rien si la source n'est pas configurée
-            if (SelectedJob == null || string.IsNullOrWhiteSpace(SelectedJob.SourceDirectory))
-                return;
-
-            try
-            {
-                await _backupEngine.ExecuteJobAsync(SelectedJob.Model);
-            }
-            catch (Exception ex)
-            {
-                // Gestion des erreurs (à afficher plus tard dans une MessageBox par exemple)
-                Console.WriteLine($"Erreur lors de la sauvegarde : {ex.Message}");
-            }
-        }
-
-        public async Task ExecuteJobsAsync(List<int> ids)
-        {
-            foreach (var id in ids)
-            {
-                var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
-                if (jobVm == null) continue;
-
-                if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory)) continue;
-
-                try
-                {
-                    await _backupEngine.ExecuteJobAsync(jobVm.Model);
-                }
-                catch
-                {
-                    throw;
-                }
-            }
+            if (SelectedJob == null || string.IsNullOrWhiteSpace(SelectedJob.SourceDirectory)) return;
+            try { await _backupEngine.ExecuteJobAsync(SelectedJob.Model); }
+            catch (Exception ex) { Console.WriteLine($"Erreur : {ex.Message}"); }
         }
 
         public void SaveConfig()
@@ -209,11 +160,7 @@ namespace EasySave.ViewModels
         public void UpdateJobName(string oldName, string newName)
         {
             var vm = Jobs.FirstOrDefault(j => j.Name == oldName);
-            if (vm != null)
-            {
-                vm.Name = newName;
-                SaveConfig();
-            }
+            if (vm != null) { vm.Name = newName; SaveConfig(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
