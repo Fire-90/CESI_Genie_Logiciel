@@ -162,6 +162,11 @@
                 <StackPanel>
                     <TextBlock Text="{Binding UIStrings[Settings]}" FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="#2C3E50"/>
 
+                    <!-- NOUVEAU : Choix du format de log -->
+                    <TextBlock Text="{Binding UIStrings[LblLogFormat]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
+                    <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat, Mode=TwoWay}" Height="30" Padding="5" Margin="0,0,0,20" VerticalContentAlignment="Center"/>
+
+                    <!-- L'existant : Logiciels métiers -->
                     <TextBlock Text="{Binding UIStrings[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
 
                     <Grid Margin="0,0,0,10">
@@ -192,3 +197,4 @@
 
     </Grid>
 </Window>
+    

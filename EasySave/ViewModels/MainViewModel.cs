@@ -63,6 +63,23 @@ namespace EasySave.ViewModels
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
 
+        // Liste des formats disponibles pour la ComboBox
+        public List<string> AvailableLogFormats { get; } = new List<string> { "JSON", "XML" };
+
+        // Propriété liée au choix de l'utilisateur
+        public string SelectedLogFormat
+        {
+            get => CurrentSettings?.LogFormat ?? "JSON";
+            set
+            {
+                if (CurrentSettings != null && CurrentSettings.LogFormat != value)
+                {
+                    CurrentSettings.LogFormat = value;
+                    OnPropertyChanged(nameof(SelectedLogFormat));
+                }
+            }
+        }
+
         private bool _isSettingsOpen = false;
         public bool IsSettingsOpen
         {
@@ -164,7 +181,8 @@ namespace EasySave.ViewModels
                     { "Settings", "⚙ Settings" },
                     { "Close", "Close" },
                     { "SaveSettings", "Save Settings" },
-                    { "Softwares", "Blocking Business Softwares:" }
+                    { "Softwares", "Blocking Business Softwares:" },
+                    { "LblLogFormat", "Logs Format:" },
                 };
             }
             else
@@ -186,7 +204,8 @@ namespace EasySave.ViewModels
                     { "Settings", "⚙ Paramètres" },
                     { "Close", "Fermer" },
                     { "SaveSettings", "Enregistrer les paramètres" },
-                    { "Softwares", "Logiciels métier bloquants :" }
+                    { "Softwares", "Logiciels métier bloquants :" },
+                    { "LblLogFormat", "Format des logs :" },
                 };
             }
         }
