@@ -195,7 +195,7 @@ namespace EasySave.ViewModels
             {
                 UIStrings = new Dictionary<string, string>
                 {
-                    { "Title", "EasySave 2.0 - ProSoft" },
+                    { "Title", "EasySave 2.0" },
                     { "LblName", "Name" },
                     { "LblSource", "Source Folder" },
                     { "LblTarget", "Target Folder" },
@@ -219,7 +219,7 @@ namespace EasySave.ViewModels
             {
                 UIStrings = new Dictionary<string, string>
                 {
-                    { "Title", "EasySave 2.0 - ProSoft" },
+                    { "Title", "EasySave 2.0" },
                     { "LblName", "Nom du travail" },
                     { "LblSource", "Dossier Source" },
                     { "LblTarget", "Dossier Cible" },
