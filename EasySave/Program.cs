@@ -27,7 +27,7 @@ namespace EasySave.ConsoleApp
 
             _configManager = new ConfigManager();
 
-            _appSettings = _configManager.LoadConfig();
+            _appSettings = _configManager.LoadSettings();
 
             ConfigureLogFormat();
 
@@ -60,20 +60,20 @@ namespace EasySave.ConsoleApp
             if (input == "xml" || input == "json")
             {
                 _appSettings.LogFormat = input;
-                _configManager.SaveConfig(_appSettings);
+                // La sauvegarde du fichier settings.json suffit maintenant ! 
+                // Le DailyLogger ira lire cette valeur tout seul lors de la prochaine écriture.
+                _configManager.SaveSettings(_appSettings);
                 Console.WriteLine($"Format enregistré : {input.ToUpper()}\n");
             }
-
-            // Transmission du format au Logger
-            EasyLog.DailyLogger.Instance.LogFormat = _appSettings.LogFormat;
         }
+
         private static async Task RunMenuLoopAsync()
         {
             bool exit = false;
             while (!exit)
             {
                 _view.DisplayMenu(_jobs);
-                _configManager.SaveConfig(_appSettings);
+                _configManager.SaveSettings(_appSettings);
                 string input = _view.ReadInput();
 
                 if (string.IsNullOrWhiteSpace(input)) continue;
@@ -118,7 +118,7 @@ namespace EasySave.ConsoleApp
                     string oldName = job.Name;
 
                     _view.ConfigureJob(job);
-                    _configManager.SaveConfig(_appSettings);
+                    _configManager.SaveSettings(_appSettings);
                     _stateTracker.UpdateJobName(oldName, job.Name);
 
                     // Feedback : Confirmation de la configuration

@@ -8,7 +8,6 @@ namespace EasySave.Services
 {
     public class ConfigManager
     {
-        private readonly string _configFilePath;
         private readonly string _settingsFilePath;
 
         public ConfigManager()
@@ -16,30 +15,28 @@ namespace EasySave.Services
             string dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
             if (!Directory.Exists(dataPath)) Directory.CreateDirectory(dataPath);
 
-            _configFilePath = Path.Combine(dataPath, "config.json");
             _settingsFilePath = Path.Combine(dataPath, "settings.json");
         }
 
-        // --- GESTION DES TRAVAUX
-        public AppSettings LoadConfig()
+        public AppSettings LoadSettings()
         {
-            if (!File.Exists(_configFilePath))
+            if (!File.Exists(_settingsFilePath))
             {
-                return CreateDefaultConfig();
+                return CreateDefaultSettings();
             }
 
             try
             {
-                string json = File.ReadAllText(_configFilePath);
-                return JsonSerializer.Deserialize<AppSettings>(json) ?? CreateDefaultConfig();
+                string json = File.ReadAllText(_settingsFilePath);
+                return JsonSerializer.Deserialize<AppSettings>(json) ?? CreateDefaultSettings();
             }
             catch (JsonException)
             {
-                return CreateDefaultConfig();
+                return CreateDefaultSettings();
             }
         }
 
-        private AppSettings CreateDefaultConfig()
+        private AppSettings CreateDefaultSettings()
         {
             var settings = new AppSettings();
             for (int i = 1; i <= 5; i++)
@@ -47,39 +44,45 @@ namespace EasySave.Services
                 // Création de 5 emplacements vides par défaut
                 settings.Jobs.Add(new BackupJob(i, $"Save{i}", "", "", BackupType.Full));
             }
-            SaveConfig(settings);
-            return settings;
-        }
-
-        public void SaveConfig(AppSettings settings)
-        {
+            // Enregistrement initial forcé sans la protection de liste vide
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(settings, options);
-            File.WriteAllText(_configFilePath, json);
-        }
+            File.WriteAllText(_settingsFilePath, json);
 
-        // --- GESTION DES PARAMÈTRES (Nouvel ajout) ---
-
-        public AppSettings LoadSettings()
-        {
-            if (!File.Exists(_settingsFilePath))
-            {
-                return new AppSettings(); // Retourne les valeurs par défaut
-            }
-
-            string json = File.ReadAllText(_settingsFilePath);
-            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            return settings;
         }
 
         public void SaveSettings(AppSettings settings)
         {
+            // Protection contre l'effacement accidentel des travaux (Jobs)
+            // Si la liste des travaux reçue est vide, on récupère celle déjà sauvegardée.
+            if (settings.Jobs == null || settings.Jobs.Count == 0)
+            {
+                if (File.Exists(_settingsFilePath))
+                {
+                    try
+                    {
+                        string existingJson = File.ReadAllText(_settingsFilePath);
+                        var existingSettings = JsonSerializer.Deserialize<AppSettings>(existingJson);
+                        if (existingSettings != null && existingSettings.Jobs != null && existingSettings.Jobs.Count > 0)
+                        {
+                            // Restauration des travaux existants
+                            settings.Jobs = existingSettings.Jobs;
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // En cas d'erreur de lecture, on ignore pour ne pas bloquer l'application
+                    }
+                }
+            }
+
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(settings, options);
             File.WriteAllText(_settingsFilePath, json);
         }
     }
 
-    // --- CLASSE DE PARAMÈTRES (Intégrée ici pour ne pas créer de nouveau fichier) ---
     public class AppSettings
     {
         public string Language { get; set; } = "FR";

@@ -17,7 +17,7 @@ namespace Graphic
 
             // 1. Initialisation des services
             var configManager = new ConfigManager();
-            var appSettings = configManager.LoadConfig();
+            var appSettings = configManager.LoadSettings();
             var stateTracker = new StateTracker(appSettings.Jobs);
             var engine = new BackupEngine(stateTracker);
 

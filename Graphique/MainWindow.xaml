@@ -4,197 +4,185 @@
         Title="{Binding UIStrings[Title]}" Height="600" Width="950" MinHeight="550" MinWidth="850"
         WindowStartupLocation="CenterScreen"
         Background="#F4F6F9">
-    <Grid>
-        <Grid Margin="20">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+	<Grid>
+		<Grid Margin="20">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="*"/>
+				<RowDefinition Height="Auto"/>
+			</Grid.RowDefinitions>
 
-            <!-- EN-TÊTE ET BOUTONS DE LANGUE -->
-            <Grid Grid.Row="0" Margin="0,0,0,20">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+			<!-- EN-TÊTE ET BOUTONS DE LANGUE -->
+			<Grid Grid.Row="0" Margin="0,0,0,20">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="Auto"/>
+				</Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" Text="{Binding UIStrings[Title]}" FontSize="28" FontWeight="Bold" Foreground="#2C3E50" VerticalAlignment="Center"/>
+				<TextBlock Grid.Column="0" Text="{Binding UIStrings[Title]}" FontSize="28" FontWeight="Bold" Foreground="#2C3E50" VerticalAlignment="Center"/>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- NOUVEAU : Bouton Paramètres -->
-                    <Button Content="{Binding UIStrings[Settings]}" Command="{Binding ToggleSettingsCommand}" Padding="15,5" Margin="0,0,15,0" Background="#95A5A6" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+				<StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+					<Button Content="{Binding UIStrings[Settings]}" Command="{Binding ToggleSettingsCommand}" Padding="15,5" Margin="0,0,15,0" Background="#95A5A6" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
 
-                    <Button Content="EN" Command="{Binding ChangeLanguageCommand}" CommandParameter="EN" Width="35" Height="35" Margin="0,0,10,0" Background="White" BorderBrush="#BDC3C7" Cursor="Hand"/>
-                    <Button Content="FR" Command="{Binding ChangeLanguageCommand}" CommandParameter="FR" Width="35" Height="35" Background="White" BorderBrush="#BDC3C7" Cursor="Hand"/>
-                </StackPanel>
-            </Grid>
+					<Button Content="EN" Command="{Binding ChangeLanguageCommand}" CommandParameter="EN" Width="35" Height="35" Margin="0,0,10,0" Background="White" BorderBrush="#BDC3C7" Cursor="Hand"/>
+					<Button Content="FR" Command="{Binding ChangeLanguageCommand}" CommandParameter="FR" Width="35" Height="35" Background="White" BorderBrush="#BDC3C7" Cursor="Hand"/>
+				</StackPanel>
+			</Grid>
 
-            <!-- DATAGRID -->
-            <DataGrid Grid.Row="1" ItemsSource="{Binding Jobs}" 
-                      SelectedItem="{Binding SelectedJob}" 
-                      AutoGenerateColumns="False" 
+			<!-- DATAGRID -->
+			<DataGrid Grid.Row="1" ItemsSource="{Binding Jobs}"
+                      SelectedItem="{Binding SelectedJob}"
+                      AutoGenerateColumns="False"
                       CanUserAddRows="False" SelectionMode="Single" IsReadOnly="True"
                       GridLinesVisibility="None" RowHeight="35" HeadersVisibility="Column"
                       AlternatingRowBackground="#E8F1F8" Background="White" BorderBrush="#BDC3C7" BorderThickness="1">
 
-                <DataGrid.Resources>
-                    <Style TargetType="DataGridColumnHeader">
-                        <Setter Property="Background" Value="#2C3E50"/>
-                        <Setter Property="Foreground" Value="White"/>
-                        <Setter Property="Padding" Value="10,8"/>
-                        <Setter Property="FontWeight" Value="SemiBold"/>
-                    </Style>
-                    <Style TargetType="DataGridCell">
-                        <Setter Property="Padding" Value="10,0"/>
-                    </Style>
-                </DataGrid.Resources>
+				<DataGrid.Resources>
+					<Style TargetType="DataGridColumnHeader">
+						<Setter Property="Background" Value="#2C3E50"/>
+						<Setter Property="Foreground" Value="White"/>
+						<Setter Property="Padding" Value="10,8"/>
+						<Setter Property="FontWeight" Value="SemiBold"/>
+					</Style>
+					<Style TargetType="DataGridCell">
+						<Setter Property="Padding" Value="10,0"/>
+					</Style>
+				</DataGrid.Resources>
 
-                <DataGrid.Columns>
-                    <!-- Colonne ID (Fixe) -->
-                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" IsReadOnly="True"/>
+				<DataGrid.Columns>
+					<DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" IsReadOnly="True"/>
 
-                    <!-- Colonne Nom -->
-                    <DataGridTextColumn Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150">
-                        <DataGridTextColumn.HeaderTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DataContext.UIStrings[LblName], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-                            </DataTemplate>
-                        </DataGridTextColumn.HeaderTemplate>
-                    </DataGridTextColumn>
+					<DataGridTextColumn Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150">
+						<DataGridTextColumn.HeaderTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding DataContext.UIStrings[LblName], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+							</DataTemplate>
+						</DataGridTextColumn.HeaderTemplate>
+					</DataGridTextColumn>
 
-                    <!-- Colonne Source -->
-                    <DataGridTextColumn Binding="{Binding SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
-                        <DataGridTextColumn.HeaderTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DataContext.UIStrings[LblSource], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-                            </DataTemplate>
-                        </DataGridTextColumn.HeaderTemplate>
-                    </DataGridTextColumn>
+					<DataGridTextColumn Binding="{Binding SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
+						<DataGridTextColumn.HeaderTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding DataContext.UIStrings[LblSource], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+							</DataTemplate>
+						</DataGridTextColumn.HeaderTemplate>
+					</DataGridTextColumn>
 
-                    <!-- Colonne Cible -->
-                    <DataGridTextColumn Binding="{Binding TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
-                        <DataGridTextColumn.HeaderTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DataContext.UIStrings[LblTarget], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-                            </DataTemplate>
-                        </DataGridTextColumn.HeaderTemplate>
-                    </DataGridTextColumn>
+					<DataGridTextColumn Binding="{Binding TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
+						<DataGridTextColumn.HeaderTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding DataContext.UIStrings[LblTarget], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+							</DataTemplate>
+						</DataGridTextColumn.HeaderTemplate>
+					</DataGridTextColumn>
 
-                    <!-- Colonne Type -->
-                    <DataGridTextColumn Binding="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100">
-                        <DataGridTextColumn.HeaderTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding DataContext.UIStrings[LblType], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-                            </DataTemplate>
-                        </DataGridTextColumn.HeaderTemplate>
-                    </DataGridTextColumn>
-                </DataGrid.Columns>
-            </DataGrid>
+					<DataGridTextColumn Binding="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100">
+						<DataGridTextColumn.HeaderTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding DataContext.UIStrings[LblType], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+							</DataTemplate>
+						</DataGridTextColumn.HeaderTemplate>
+					</DataGridTextColumn>
+				</DataGrid.Columns>
+			</DataGrid>
 
-            <!-- ZONE D'ÉDITION ET D'ACTION -->
-            <Grid Grid.Row="2" Margin="0,20,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+			<!-- ZONE D'ÉDITION ET D'ACTION -->
+			<Grid Grid.Row="2" Margin="0,20,0,0">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="Auto"/>
+				</Grid.RowDefinitions>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
 
-                <!-- LIGNE 1 : Nom et Type -->
-                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,15,10">
-                    <TextBlock Text="{Binding UIStrings[LblName]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-                    <TextBox Text="{Binding SelectedJob.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-                </StackPanel>
+				<!-- LIGNE 1 : Nom et Type (Désactivé si rien n'est sélectionné) -->
+				<StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,15,10" IsEnabled="{Binding IsJobSelected}">
+					<TextBlock Text="{Binding UIStrings[LblName]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+					<TextBox Text="{Binding SelectedJob.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+				</StackPanel>
 
-                <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,10">
-                    <TextBlock Text="{Binding UIStrings[LblType]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-                    <ComboBox ItemsSource="{Binding AvailableTypes}" SelectedItem="{Binding SelectedJob.Type, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-                </StackPanel>
+				<StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,10" IsEnabled="{Binding IsJobSelected}">
+					<TextBlock Text="{Binding UIStrings[LblType]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+					<ComboBox ItemsSource="{Binding AvailableTypes}" SelectedItem="{Binding SelectedJob.Type, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+				</StackPanel>
 
-                <!-- LIGNE 2 : Source et Cible -->
-                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,20">
-                    <TextBlock Text="{Binding UIStrings[LblSource]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-                    <TextBox Text="{Binding SelectedJob.SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-                </StackPanel>
+				<!-- LIGNE 2 : Source et Cible (Désactivé si rien n'est sélectionné) -->
+				<StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,20" IsEnabled="{Binding IsJobSelected}">
+					<TextBlock Text="{Binding UIStrings[LblSource]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+					<TextBox Text="{Binding SelectedJob.SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+				</StackPanel>
 
-                <StackPanel Grid.Row="1" Grid.Column="1" Margin="15,0,0,20">
-                    <TextBlock Text="{Binding UIStrings[LblTarget]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-                    <TextBox Text="{Binding SelectedJob.TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-                </StackPanel>
+				<StackPanel Grid.Row="1" Grid.Column="1" Margin="15,0,0,20" IsEnabled="{Binding IsJobSelected}">
+					<TextBlock Text="{Binding UIStrings[LblTarget]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+					<TextBox Text="{Binding SelectedJob.TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+				</StackPanel>
 
-                <!-- LIGNE 3 : Infos progression et Boutons -->
-                <StackPanel Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding UIStrings[Recent]}" FontWeight="Bold" Foreground="Gray"/>
-                    <TextBlock Text="{Binding CurrentFile}" FontStyle="Italic" TextTrimming="CharacterEllipsis" Foreground="#34495E"/>
-                </StackPanel>
+				<!-- LIGNE 3 : Infos progression et Boutons -->
+				<StackPanel Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">
+					<TextBlock Text="{Binding UIStrings[Recent]}" FontWeight="Bold" Foreground="Gray"/>
+					<TextBlock Text="{Binding CurrentFile}" FontStyle="Italic" TextTrimming="CharacterEllipsis" Foreground="#34495E"/>
+				</StackPanel>
 
-                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="{Binding UIStrings[BtnAdd]}" Command="{Binding AddJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                    <Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding DeleteJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                    <Button Content="{Binding UIStrings[BtnRun]}" Command="{Binding ExecuteSelectionCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                </StackPanel>
-            </Grid>
-        </Grid>
+				<StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+					<Button Content="{Binding UIStrings[BtnAdd]}" Command="{Binding AddJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+					<Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding DeleteJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+					<Button Content="{Binding UIStrings[BtnRun]}" Command="{Binding ExecuteSelectionCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+				</StackPanel>
+			</Grid>
+		</Grid>
 
-        <!-- COUCHE 2 : LE MENU DES PARAMÈTRES SUPERPOSÉ (Caché par défaut) -->
-        <Border Background="#D8F4F6F9" Panel.ZIndex="10">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
-                            <Setter Property="Visibility" Value="Visible"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
+		<!-- COUCHE 2 : LE MENU DES PARAMÈTRES SUPERPOSÉ (Caché par défaut) -->
+		<Border Background="#D8F4F6F9" Panel.ZIndex="10">
+			<Border.Style>
+				<Style TargetType="Border">
+					<Setter Property="Visibility" Value="Collapsed"/>
+					<Style.Triggers>
+						<DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
+							<Setter Property="Visibility" Value="Visible"/>
+						</DataTrigger>
+					</Style.Triggers>
+				</Style>
+			</Border.Style>
 
-            <!-- La "boite" des paramètres au centre -->
-            <Border Background="White" CornerRadius="10" Padding="30" Width="450" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="15" Opacity="0.3" ShadowDepth="4"/>
-                </Border.Effect>
+			<Border Background="White" CornerRadius="10" Padding="30" Width="450" VerticalAlignment="Center" HorizontalAlignment="Center">
+				<Border.Effect>
+					<DropShadowEffect BlurRadius="15" Opacity="0.3" ShadowDepth="4"/>
+				</Border.Effect>
 
-                <StackPanel>
-                    <TextBlock Text="{Binding UIStrings[Settings]}" FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="#2C3E50"/>
+				<StackPanel>
+					<TextBlock Text="{Binding UIStrings[Settings]}" FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="#2C3E50"/>
 
-                    <!-- NOUVEAU : Choix du format de log -->
-                    <TextBlock Text="{Binding UIStrings[LblLogFormat]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
-                    <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat, Mode=TwoWay}" Height="30" Padding="5" Margin="0,0,0,20" VerticalContentAlignment="Center"/>
+					<TextBlock Text="{Binding UIStrings[LblLogFormat]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
+					<ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat, Mode=TwoWay}" Height="30" Padding="5" Margin="0,0,0,20" VerticalContentAlignment="Center"/>
 
-                    <!-- L'existant : Logiciels métiers -->
-                    <TextBlock Text="{Binding UIStrings[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
+					<TextBlock Text="{Binding UIStrings[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
 
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0" Text="{Binding NewSoftware, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
-                        <Button Grid.Column="1" Content="+" Command="{Binding AddSoftwareCommand}" Width="35" Background="#3498DB" Foreground="White" FontSize="18" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                    </Grid>
+					<Grid Margin="0,0,0,10">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="Auto"/>
+						</Grid.ColumnDefinitions>
+						<TextBox Grid.Column="0" Text="{Binding NewSoftware, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
+						<Button Grid.Column="1" Content="+" Command="{Binding AddSoftwareCommand}" Width="35" Background="#3498DB" Foreground="White" FontSize="18" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+					</Grid>
 
-                    <ListBox ItemsSource="{Binding Softwares}" SelectedItem="{Binding SelectedSoftware}" Height="120" Margin="0,0,0,10" Padding="5" BorderBrush="#BDC3C7"/>
+					<ListBox ItemsSource="{Binding Softwares}" SelectedItem="{Binding SelectedSoftware}" Height="120" Margin="0,0,0,10" Padding="5" BorderBrush="#BDC3C7"/>
 
-                    <Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" Padding="15,5" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Margin="0,0,0,30" HorizontalAlignment="Right" Cursor="Hand"/>
+					<Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" Padding="15,5" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Margin="0,0,0,30" HorizontalAlignment="Right" Cursor="Hand"/>
 
-                    <!-- Boutons du bas du menu Paramètres -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="{Binding UIStrings[Close]}" Command="{Binding ToggleSettingsCommand}" Padding="15,10" Margin="0,0,10,0" Background="#95A5A6" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                        <Button Grid.Column="1" Content="{Binding UIStrings[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
-        </Border>
-
-    </Grid>
+					<Grid>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="Auto"/>
+						</Grid.ColumnDefinitions>
+						<Button Grid.Column="0" Content="{Binding UIStrings[Close]}" Command="{Binding ToggleSettingsCommand}" Padding="15,10" Margin="0,0,10,0" Background="#95A5A6" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+						<Button Grid.Column="1" Content="{Binding UIStrings[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+					</Grid>
+				</StackPanel>
+			</Border>
+		</Border>
+	</Grid>
 </Window>
-    
