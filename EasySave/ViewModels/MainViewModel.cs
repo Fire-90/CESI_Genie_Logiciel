@@ -74,12 +74,34 @@ namespace EasySave.ViewModels
             get => CurrentSettings?.LogFormat?.ToUpper() ?? "JSON";
             set
             {
-                // Sauvegarde en minuscules par convention
                 string newValue = value?.ToLower() ?? "json";
                 if (CurrentSettings != null && CurrentSettings.LogFormat != newValue)
                 {
                     CurrentSettings.LogFormat = newValue;
                     OnPropertyChanged(nameof(SelectedLogFormat));
+                }
+            }
+        }
+
+        // NOUVEAU : Propriété gérant la chaîne d'extensions (ex: ".txt;.pdf")
+        public string EncryptedExtensionsString
+        {
+            get
+            {
+                if (CurrentSettings?.EncryptedExtensions == null) return "";
+                return string.Join(";", CurrentSettings.EncryptedExtensions);
+            }
+            set
+            {
+                if (CurrentSettings != null)
+                {
+                    // Découpe la chaîne par rapport au ';' et nettoie les espaces éventuels
+                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                          .Select(e => e.Trim())
+                                          .ToList();
+
+                    CurrentSettings.EncryptedExtensions = extensions;
+                    OnPropertyChanged(nameof(EncryptedExtensionsString));
                 }
             }
         }
@@ -182,7 +204,6 @@ namespace EasySave.ViewModels
                     { "BtnRun", "▶ Execute selection" },
                     { "BtnDelete", "🗑 Delete" },
                     { "Recent", "Recent activity:" },
-                    // Nouveaux messages
                     { "MsgEmptyPath", "❌ Error: The Source or Target folder is empty." },
                     { "MsgSlotAdded", "✅ New empty job added." },
                     { "MsgDeleted", "🗑️ Job successfully deleted." },
@@ -191,6 +212,7 @@ namespace EasySave.ViewModels
                     { "SaveSettings", "Save Settings" },
                     { "Softwares", "Blocking Business Softwares:" },
                     { "LblLogFormat", "Logs Format:" },
+                    { "LblEncryptedExt", "Encrypted Extensions (e.g., .txt;.pdf):" }
                 };
             }
             else
@@ -206,7 +228,6 @@ namespace EasySave.ViewModels
                     { "BtnRun", "▶ Lancer la sélection" },
                     { "BtnDelete", "🗑 Supprimer" },
                     { "Recent", "Activité récente :" },
-                    // Nouveaux messages
                     { "MsgEmptyPath", "❌ Erreur : Le dossier Source ou Cible est vide." },
                     { "MsgSlotAdded", "✅ Nouveau travail vide ajouté." },
                     { "MsgDeleted", "🗑️ Travail supprimé avec succès." },
@@ -215,6 +236,7 @@ namespace EasySave.ViewModels
                     { "SaveSettings", "Enregistrer les paramètres" },
                     { "Softwares", "Logiciels métier bloquants :" },
                     { "LblLogFormat", "Format des logs :" },
+                    { "LblEncryptedExt", "Extensions à chiffrer (ex: .txt;.pdf) :" }
                 };
             }
         }
@@ -229,14 +251,13 @@ namespace EasySave.ViewModels
 
         private void ExecuteAddJob(object parameter)
         {
-            // Retrait de la condition qui empêchait l'ajout si des champs étaient vides
             int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1;
             var newModel = new BackupJob
             {
                 Id = newId,
                 Name = $"Save {newId}",
-                SourceDirectory = "", // Slot volontairement vide
-                TargetDirectory = "", // Slot volontairement vide
+                SourceDirectory = "",
+                TargetDirectory = "",
                 Type = BackupType.Full
             };
 
@@ -248,7 +269,7 @@ namespace EasySave.ViewModels
             SaveConfig();
 
             SelectedJob = newViewModel;
-            CurrentFile = UIStrings["MsgSlotAdded"]; // Message de confirmation
+            CurrentFile = UIStrings["MsgSlotAdded"];
         }
 
         private void ExecuteDeleteJob(object parameter)
@@ -270,10 +291,9 @@ namespace EasySave.ViewModels
         {
             if (SelectedJob == null) return;
 
-            // NOUVEAU : Vérification stricte des chemins vides avant de lancer le BackupEngine
             if (string.IsNullOrWhiteSpace(SelectedJob.SourceDirectory) || string.IsNullOrWhiteSpace(SelectedJob.TargetDirectory))
             {
-                CurrentFile = UIStrings["MsgEmptyPath"]; // Affichage de l'erreur dans l'UI
+                CurrentFile = UIStrings["MsgEmptyPath"];
                 return;
             }
 
