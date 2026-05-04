@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -14,20 +15,27 @@ namespace EasySave.Services
         public event ProgressUpdateHandler OnProgressUpdate;
 
         private StateTracker _stateTracker;
+        private readonly ConfigManager _configManager;
 
-        // NOUVEAU : Une liste des logiciels métier à surveiller (sans le .exe)
-        private readonly string[] _businessSoftwares = { "calculatorapp", "notepad" };
-
-        public BackupEngine(StateTracker stateTracker)
+        // Le constructeur prend désormais ConfigManager pour lire les paramètres dynamiquement
+        public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
         {
             _stateTracker = stateTracker;
+            _configManager = configManager;
         }
 
-        // --- NOUVELLE MÉTHODE DE DÉTECTION ---
+        // --- DÉTECTION DYNAMIQUE DES LOGICIELS MÉTIER ---
         private string GetRunningBusinessSoftware()
         {
-            foreach (string software in _businessSoftwares)
+            var settings = _configManager.LoadSettings();
+            var businessSoftwares = settings.BusinessSoftwares;
+
+            if (businessSoftwares == null) return null;
+
+            foreach (string software in businessSoftwares)
             {
+                if (string.IsNullOrWhiteSpace(software)) continue;
+
                 Process[] processes = Process.GetProcessesByName(software);
                 if (processes.Length > 0)
                 {
@@ -39,7 +47,6 @@ namespace EasySave.Services
 
         public async Task ExecuteJobAsync(BackupJob job)
         {
-            // 1. Vérification AVANT de lancer le travail
             string blockingSoftware = GetRunningBusinessSoftware();
             if (blockingSoftware != null)
             {
@@ -91,11 +98,9 @@ namespace EasySave.Services
 
             foreach (string file in Directory.GetFiles(sourceDir))
             {
-                // 2. Vérification PENDANT le travail (avant de copier le prochain fichier)
                 string blockingSoftware = GetRunningBusinessSoftware();
                 if (blockingSoftware != null)
                 {
-                    // L'exception arrête la boucle, mais le fichier précédent a eu le temps de finir sa copie
                     throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{blockingSoftware}'.");
                 }
 
@@ -138,10 +143,51 @@ namespace EasySave.Services
             Stopwatch stopwatch = new Stopwatch();
             long timeMs = 0;
 
+            // Lecture des extensions à chiffrer
+            var settings = _configManager.LoadSettings();
+            List<string> encryptedExtensions = settings.EncryptedExtensions ?? new List<string>();
+            string fileExtension = Path.GetExtension(source).ToLower();
+            bool shouldEncrypt = encryptedExtensions.Contains(fileExtension);
+
             try
             {
                 stopwatch.Start();
-                File.Copy(source, target, true);
+
+                if (shouldEncrypt)
+                {
+                    // --- CHIFFREMENT ---
+                    string cryptoSoftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
+
+                    if (File.Exists(cryptoSoftPath))
+                    {
+                        ProcessStartInfo startInfo = new ProcessStartInfo
+                        {
+                            FileName = cryptoSoftPath,
+                            Arguments = $"\"{source}\" \"{target}\"",
+                            CreateNoWindow = true,
+                            UseShellExecute = false
+                        };
+
+                        using (Process process = Process.Start(startInfo))
+                        {
+                            process.WaitForExit();
+                            if (process.ExitCode != 0)
+                            {
+                                throw new Exception("Erreur d'exécution de CryptoSoft.");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        throw new FileNotFoundException("Exécutable CryptoSoft.exe introuvable.");
+                    }
+                }
+                else
+                {
+                    // --- COPIE STANDARD ---
+                    File.Copy(source, target, true);
+                }
+
                 stopwatch.Stop();
                 timeMs = stopwatch.ElapsedMilliseconds;
 

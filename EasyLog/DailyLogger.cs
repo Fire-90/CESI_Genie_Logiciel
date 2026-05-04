@@ -8,7 +8,6 @@ using System.Xml.Serialization;
 
 namespace EasyLog
 {
-    // L'attribut est ajouté pour s'assurer que la classe est publique et sérialisable en XML
     [Serializable]
     public class LogEntry
     {
@@ -36,10 +35,8 @@ namespace EasyLog
         private static readonly Lazy<DailyLogger> _instance = new Lazy<DailyLogger>(() => new DailyLogger());
         public static DailyLogger Instance => _instance.Value;
 
-        // Propriété définissant le format (assignée depuis Program.cs)
-        public string LogFormat { get; set; } = "json";
-
         private readonly string _logDirectory;
+        private readonly string _settingsFilePath;
         private static readonly object _lockObj = new object();
 
         private DailyLogger()
@@ -47,17 +44,47 @@ namespace EasyLog
             string exePath = AppDomain.CurrentDomain.BaseDirectory;
             _logDirectory = Path.Combine(exePath, "data", "logs");
 
+            // Nouveau chemin vers les paramètres partagés
+            _settingsFilePath = Path.Combine(exePath, "data", "settings.json");
+
             if (!Directory.Exists(_logDirectory))
             {
                 Directory.CreateDirectory(_logDirectory);
             }
         }
 
+        // NOUVEAU : Lecture dynamique du format depuis settings.json
+        private string GetCurrentLogFormat()
+        {
+            try
+            {
+                if (File.Exists(_settingsFilePath))
+                {
+                    string json = File.ReadAllText(_settingsFilePath);
+                    using (JsonDocument doc = JsonDocument.Parse(json))
+                    {
+                        if (doc.RootElement.TryGetProperty("LogFormat", out JsonElement formatElement))
+                        {
+                            return formatElement.GetString() ?? "json";
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // En cas d'erreur de lecture, on garde le JSON par défaut
+            }
+            return "json";
+        }
+
         public async Task WriteLogAsync(LogEntry entry)
         {
+            // Récupération du format de journal actuel avant d'écrire
+            string currentFormat = GetCurrentLogFormat();
+
             lock (_lockObj)
             {
-                if (LogFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
+                if (currentFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
                 {
                     WriteXmlLog(entry);
                 }
