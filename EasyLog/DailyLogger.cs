@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 
+
 namespace EasyLog
 {
     // L'attribut est ajouté pour s'assurer que la classe est publique et sérialisable en XML

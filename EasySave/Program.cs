@@ -15,6 +15,7 @@ namespace EasySave.ConsoleApp
         private static BackupEngine _engine;
         private static ConfigManager _configManager;
         private static StateTracker _stateTracker;
+        private static AppSettings _appSettings;
         private static List<BackupJob> _jobs;
 
         static async Task Main(string[] args)
@@ -25,7 +26,12 @@ namespace EasySave.ConsoleApp
             LanguageManager.SetLanguage(lang);
 
             _configManager = new ConfigManager();
-            _jobs = _configManager.LoadConfig();
+
+            _appSettings = _configManager.LoadConfig();
+
+            ConfigureLogFormat();
+
+            _jobs = _appSettings.Jobs;
             _stateTracker = new StateTracker(_jobs);
             _engine = new BackupEngine(_stateTracker);
 
@@ -42,12 +48,32 @@ namespace EasySave.ConsoleApp
             }
         }
 
+        private static void ConfigureLogFormat()
+        {
+            // Note : L'idéal architectural serait de placer ces Console.WriteLine dans ConsoleView.
+            Console.WriteLine($"\nFormat de log actuel : {_appSettings.LogFormat.ToUpper()}");
+            Console.WriteLine("Souhaitez-vous utiliser le format JSON ou XML ? (Laissez vide pour conserver la valeur actuelle)");
+            Console.Write("> ");
+
+            string input = Console.ReadLine()?.Trim().ToLower();
+
+            if (input == "xml" || input == "json")
+            {
+                _appSettings.LogFormat = input;
+                _configManager.SaveConfig(_appSettings);
+                Console.WriteLine($"Format enregistré : {input.ToUpper()}\n");
+            }
+
+            // Transmission du format au Logger
+            EasyLog.DailyLogger.Instance.LogFormat = _appSettings.LogFormat;
+        }
         private static async Task RunMenuLoopAsync()
         {
             bool exit = false;
             while (!exit)
             {
                 _view.DisplayMenu(_jobs);
+                _configManager.SaveConfig(_appSettings);
                 string input = _view.ReadInput();
 
                 if (string.IsNullOrWhiteSpace(input)) continue;
@@ -92,7 +118,7 @@ namespace EasySave.ConsoleApp
                     string oldName = job.Name;
 
                     _view.ConfigureJob(job);
-                    _configManager.SaveConfig(_jobs);
+                    _configManager.SaveConfig(_appSettings);
                     _stateTracker.UpdateJobName(oldName, job.Name);
 
                     // Feedback : Confirmation de la configuration

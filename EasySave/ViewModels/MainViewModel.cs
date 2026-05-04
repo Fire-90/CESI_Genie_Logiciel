@@ -18,6 +18,7 @@ namespace EasySave.ViewModels
 
         // --- PROPRIÉTÉS DES TRAVAUX ---
         public ObservableCollection<JobViewModel> Jobs { get; }
+
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
 
         private JobViewModel _selectedJob;
@@ -97,8 +98,8 @@ namespace EasySave.ViewModels
             _backupEngine = backupEngine;
 
             // Chargement des travaux
-            var loadedJobs = _configManager.LoadConfig();
-            Jobs = new ObservableCollection<JobViewModel>(loadedJobs.Select(j => new JobViewModel(j)));
+            var loadedConfig = _configManager.LoadConfig(); // Retourne un AppSettings
+            Jobs = new ObservableCollection<JobViewModel>(loadedConfig.Jobs.Select(j => new JobViewModel(j)));
 
             // Chargement des paramètres (NOUVEAU)
             CurrentSettings = _configManager.LoadSettings();
@@ -278,7 +279,7 @@ namespace EasySave.ViewModels
         public void SaveConfig()
         {
             var models = Jobs.Select(j => j.Model).ToList();
-            _configManager.SaveConfig(models);
+            _configManager.SaveConfig(new AppSettings { Jobs = models });
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
