@@ -18,7 +18,10 @@ namespace EasySave.ViewModels
 
         // --- PROPRIÉTÉS DES TRAVAUX ---
         public ObservableCollection<JobViewModel> Jobs { get; }
+
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
+
+        public bool IsJobSelected => SelectedJob != null;
 
         private JobViewModel _selectedJob;
         public JobViewModel SelectedJob
@@ -30,6 +33,8 @@ namespace EasySave.ViewModels
                 {
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
+
+                    OnPropertyChanged(nameof(IsJobSelected));
 
                     (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
                     (DeleteJobCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -58,9 +63,48 @@ namespace EasySave.ViewModels
             set { _uiStrings = value; OnPropertyChanged(nameof(UIStrings)); }
         }
 
-        // --- PROPRIÉTÉS DES PARAMÈTRES (NOUVEAU) ---
+        // --- PROPRIÉTÉS DES PARAMÈTRES ---
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
+
+        public List<string> AvailableLogFormats { get; } = new List<string> { "JSON", "XML" };
+
+        public string SelectedLogFormat
+        {
+            get => CurrentSettings?.LogFormat?.ToUpper() ?? "JSON";
+            set
+            {
+                string newValue = value?.ToLower() ?? "json";
+                if (CurrentSettings != null && CurrentSettings.LogFormat != newValue)
+                {
+                    CurrentSettings.LogFormat = newValue;
+                    OnPropertyChanged(nameof(SelectedLogFormat));
+                }
+            }
+        }
+
+        // NOUVEAU : Propriété gérant la chaîne d'extensions (ex: ".txt;.pdf")
+        public string EncryptedExtensionsString
+        {
+            get
+            {
+                if (CurrentSettings?.EncryptedExtensions == null) return "";
+                return string.Join(";", CurrentSettings.EncryptedExtensions);
+            }
+            set
+            {
+                if (CurrentSettings != null)
+                {
+                    // Découpe la chaîne par rapport au ';' et nettoie les espaces éventuels
+                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                          .Select(e => e.Trim())
+                                          .ToList();
+
+                    CurrentSettings.EncryptedExtensions = extensions;
+                    OnPropertyChanged(nameof(EncryptedExtensionsString));
+                }
+            }
+        }
 
         private bool _isSettingsOpen = false;
         public bool IsSettingsOpen
@@ -83,8 +127,6 @@ namespace EasySave.ViewModels
         public ICommand ExecuteSelectionCommand { get; }
         public ICommand DeleteJobCommand { get; }
         public ICommand ChangeLanguageCommand { get; }
-
-        // Commandes des paramètres (NOUVEAU)
         public ICommand ToggleSettingsCommand { get; }
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
@@ -96,23 +138,24 @@ namespace EasySave.ViewModels
             _stateTracker = stateTracker;
             _backupEngine = backupEngine;
 
-            // Chargement des travaux
-            var loadedJobs = _configManager.LoadConfig();
-            Jobs = new ObservableCollection<JobViewModel>(loadedJobs.Select(j => new JobViewModel(j)));
-
-            // Chargement des paramètres (NOUVEAU)
             CurrentSettings = _configManager.LoadSettings();
+
+            Jobs = new ObservableCollection<JobViewModel>(CurrentSettings.Jobs.Select(j => new JobViewModel(j)));
+
+            foreach (var job in Jobs)
+            {
+                job.PropertyChanged += OnJobPropertyChanged;
+            }
+
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
 
             _backupEngine.OnProgressUpdate += (file, remaining) => { CurrentFile = file; };
 
-            // Initialisation des commandes des travaux
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
 
-            // Initialisation des commandes des paramètres (NOUVEAU)
             ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
 
             AddSoftwareCommand = new RelayCommand(p =>
@@ -131,24 +174,28 @@ namespace EasySave.ViewModels
 
             SaveSettingsCommand = new RelayCommand(SaveSettings);
 
-            // Applique la langue sauvegardée au lieu de forcer "FR"
             ChangeLanguage(CurrentSettings.Language);
         }
 
-        // --- GESTION DE LA LANGUE ET PARAMÈTRES ---
+        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            SaveConfig();
+        }
+
         private void ChangeLanguage(object param)
         {
             string lang = param as string ?? "FR";
 
-            // On sauvegarde le choix de langue dynamiquement
             CurrentSettings.Language = lang;
+
+            CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
 
             if (lang == "EN")
             {
                 UIStrings = new Dictionary<string, string>
                 {
-                    { "Title", "EasySave 2.0 - ProSoft" },
+                    { "Title", "EasySave 2.0" },
                     { "LblName", "Name" },
                     { "LblSource", "Source Folder" },
                     { "LblTarget", "Target Folder" },
@@ -157,20 +204,22 @@ namespace EasySave.ViewModels
                     { "BtnRun", "▶ Execute selection" },
                     { "BtnDelete", "🗑 Delete" },
                     { "Recent", "Recent activity:" },
-                    { "MsgEmpty", "⚠️ Please fill all empty fields before creating a new job." },
+                    { "MsgEmptyPath", "❌ Error: The Source or Target folder is empty." },
+                    { "MsgSlotAdded", "✅ New empty job added." },
                     { "MsgDeleted", "🗑️ Job successfully deleted." },
-                    // Nouveaux textes pour les paramètres
                     { "Settings", "⚙ Settings" },
                     { "Close", "Close" },
                     { "SaveSettings", "Save Settings" },
-                    { "Softwares", "Blocking Business Softwares:" }
+                    { "Softwares", "Blocking Business Softwares:" },
+                    { "LblLogFormat", "Logs Format:" },
+                    { "LblEncryptedExt", "Encrypted Extensions (e.g., .txt;.pdf):" }
                 };
             }
             else
             {
                 UIStrings = new Dictionary<string, string>
                 {
-                    { "Title", "EasySave 2.0 - ProSoft" },
+                    { "Title", "EasySave 2.0" },
                     { "LblName", "Nom du travail" },
                     { "LblSource", "Dossier Source" },
                     { "LblTarget", "Dossier Cible" },
@@ -179,13 +228,15 @@ namespace EasySave.ViewModels
                     { "BtnRun", "▶ Lancer la sélection" },
                     { "BtnDelete", "🗑 Supprimer" },
                     { "Recent", "Activité récente :" },
-                    { "MsgEmpty", "⚠️ Veuillez remplir tous les champs vides avant d'ajouter un nouveau travail." },
+                    { "MsgEmptyPath", "❌ Erreur : Le dossier Source ou Cible est vide." },
+                    { "MsgSlotAdded", "✅ Nouveau travail vide ajouté." },
                     { "MsgDeleted", "🗑️ Travail supprimé avec succès." },
-                    // Nouveaux textes pour les paramètres
                     { "Settings", "⚙ Paramètres" },
                     { "Close", "Fermer" },
                     { "SaveSettings", "Enregistrer les paramètres" },
-                    { "Softwares", "Logiciels métier bloquants :" }
+                    { "Softwares", "Logiciels métier bloquants :" },
+                    { "LblLogFormat", "Format des logs :" },
+                    { "LblEncryptedExt", "Extensions à chiffrer (ex: .txt;.pdf) :" }
                 };
             }
         }
@@ -193,24 +244,13 @@ namespace EasySave.ViewModels
         private void SaveSettings(object parameter)
         {
             CurrentSettings.BusinessSoftwares = Softwares.ToList();
+            CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
-            IsSettingsOpen = false; // Ferme le menu après avoir cliqué sur sauvegarder
+            IsSettingsOpen = false;
         }
 
-        // --- LOGIQUE D'AJOUT AVEC VÉRIFICATION ---
         private void ExecuteAddJob(object parameter)
         {
-            bool hasEmptyFields = Jobs.Any(j =>
-                string.IsNullOrWhiteSpace(j.Name) ||
-                string.IsNullOrWhiteSpace(j.SourceDirectory) ||
-                string.IsNullOrWhiteSpace(j.TargetDirectory));
-
-            if (hasEmptyFields)
-            {
-                CurrentFile = UIStrings["MsgEmpty"];
-                return;
-            }
-
             int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1;
             var newModel = new BackupJob
             {
@@ -222,17 +262,22 @@ namespace EasySave.ViewModels
             };
 
             var newViewModel = new JobViewModel(newModel);
+
+            newViewModel.PropertyChanged += OnJobPropertyChanged;
+
             Jobs.Add(newViewModel);
             SaveConfig();
 
             SelectedJob = newViewModel;
+            CurrentFile = UIStrings["MsgSlotAdded"];
         }
 
-        // --- LOGIQUE DE SUPPRESSION ---
         private void ExecuteDeleteJob(object parameter)
         {
             if (SelectedJob != null)
             {
+                SelectedJob.PropertyChanged -= OnJobPropertyChanged;
+
                 Jobs.Remove(SelectedJob);
                 SaveConfig();
                 CurrentFile = UIStrings["MsgDeleted"];
@@ -244,7 +289,13 @@ namespace EasySave.ViewModels
 
         private async void ExecuteSelectedJob(object parameter)
         {
-            if (SelectedJob == null || string.IsNullOrWhiteSpace(SelectedJob.SourceDirectory)) return;
+            if (SelectedJob == null) return;
+
+            if (string.IsNullOrWhiteSpace(SelectedJob.SourceDirectory) || string.IsNullOrWhiteSpace(SelectedJob.TargetDirectory))
+            {
+                CurrentFile = UIStrings["MsgEmptyPath"];
+                return;
+            }
 
             try
             {
@@ -258,7 +309,6 @@ namespace EasySave.ViewModels
             }
         }
 
-        // --- POUR LE TERMINAL (.\Graphic.exe "1-2") ---
         public async Task ExecuteJobsAsync(List<int> ids)
         {
             try
@@ -267,7 +317,8 @@ namespace EasySave.ViewModels
                 foreach (var id in ids)
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
-                    if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory)) continue;
+                    if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
+
                     await _backupEngine.ExecuteJobAsync(jobVm.Model);
                 }
                 CurrentFile = "✅ Toutes les sauvegardes sont terminées avec succès !";
@@ -277,8 +328,8 @@ namespace EasySave.ViewModels
 
         public void SaveConfig()
         {
-            var models = Jobs.Select(j => j.Model).ToList();
-            _configManager.SaveConfig(models);
+            CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
+            _configManager.SaveSettings(CurrentSettings);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
