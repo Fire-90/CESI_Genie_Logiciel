@@ -16,5 +16,4 @@
 	<ItemGroup>
 		<ProjectReference Include="..\EasySave\Engine.csproj" />
 	</ItemGroup>
-
 </Project>

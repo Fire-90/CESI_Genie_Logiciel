@@ -33,7 +33,7 @@ namespace EasySave.ConsoleApp
 
             _jobs = _appSettings.Jobs;
             _stateTracker = new StateTracker(_jobs);
-            _engine = new BackupEngine(_stateTracker);
+            _engine = new BackupEngine(_stateTracker, _configManager);
 
             _engine.OnProgressUpdate += (file, remaining) =>
                 _view.DisplayMessage("Copying", file);

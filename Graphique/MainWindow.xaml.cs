@@ -19,7 +19,7 @@ namespace Graphic
             var configManager = new ConfigManager();
             var appSettings = configManager.LoadSettings();
             var stateTracker = new StateTracker(appSettings.Jobs);
-            var engine = new BackupEngine(stateTracker);
+            var engine = new BackupEngine(stateTracker, configManager);
 
             // 2. Création du ViewModel
             _mainViewModel = new MainViewModel(configManager, stateTracker, engine);
