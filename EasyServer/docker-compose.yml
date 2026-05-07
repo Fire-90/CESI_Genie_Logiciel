@@ -1,0 +1,12 @@
+services:
+  easyserver:
+    build: .
+    container_name: easyserver_app
+    ports:
+      - "11000:11000"
+    environment:
+      - DOTNET_RUNNING_IN_CONTAINER=true
+    volumes:
+      # Lie le dossier local ./data au dossier /App/data du conteneur
+      - ./data:/App/data
+    restart: unless-stopped

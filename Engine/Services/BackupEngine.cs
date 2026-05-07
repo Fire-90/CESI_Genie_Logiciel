@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using EasySave.Models;
 using EasyLog;
@@ -14,82 +13,51 @@ namespace EasySave.Services
         public delegate void ProgressUpdateHandler(string currentFile, int remainingFiles);
         public event ProgressUpdateHandler OnProgressUpdate;
 
-        private StateTracker _stateTracker;
+        private readonly StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
 
-        // Le constructeur prend désormais ConfigManager pour lire les paramètres dynamiquement
         public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
         {
             _stateTracker = stateTracker;
             _configManager = configManager;
         }
 
-        // --- DÉTECTION DYNAMIQUE DES LOGICIELS MÉTIER ---
         private string GetRunningBusinessSoftware()
         {
             var settings = _configManager.LoadSettings();
-            var businessSoftwares = settings.BusinessSoftwares;
+            if (settings.BusinessSoftwares == null) return null;
 
-            if (businessSoftwares == null) return null;
-
-            foreach (string software in businessSoftwares)
+            foreach (string software in settings.BusinessSoftwares)
             {
                 if (string.IsNullOrWhiteSpace(software)) continue;
-
-                Process[] processes = Process.GetProcessesByName(software);
-                if (processes.Length > 0)
-                {
-                    return software;
-                }
+                if (Process.GetProcessesByName(software).Length > 0) return software;
             }
             return null;
         }
 
         public async Task ExecuteJobAsync(BackupJob job)
         {
-            string blockingSoftware = GetRunningBusinessSoftware();
-            if (blockingSoftware != null)
-            {
-                throw new Exception($"Lancement impossible : Le logiciel métier '{blockingSoftware}' est ouvert.");
-            }
+            string blocking = GetRunningBusinessSoftware();
+            if (blocking != null) throw new Exception($"Logiciel bloquant détecté : {blocking}");
 
-            if (string.IsNullOrWhiteSpace(job.SourceDirectory) || !Directory.Exists(job.SourceDirectory))
-            {
-                throw new DirectoryNotFoundException($"Source invalide ou introuvable pour {job.Name}");
-            }
-
-            int totalFilesToCopy = 0;
-            long totalFilesSize = 0;
+            if (!Directory.Exists(job.SourceDirectory)) throw new DirectoryNotFoundException("Source introuvable.");
 
             string[] allFiles = Directory.GetFiles(job.SourceDirectory, "*.*", SearchOption.AllDirectories);
-            foreach (string file in allFiles)
-            {
-                totalFilesToCopy++;
-                totalFilesSize += new FileInfo(file).Length;
-            }
+            long totalSize = 0;
+            foreach (string f in allFiles) totalSize += new FileInfo(f).Length;
 
             _stateTracker.UpdateState(job.Name, s =>
             {
                 s.State = "ACTIVE";
-                s.TotalFilesToCopy = totalFilesToCopy;
-                s.TotalFilesSize = totalFilesSize;
-                s.NbFilesLeftToDo = totalFilesToCopy;
-                s.RemainingFilesSize = totalFilesSize;
-                s.Progression = 0;
+                s.TotalFilesToCopy = allFiles.Length;
+                s.TotalFilesSize = totalSize;
+                s.NbFilesLeftToDo = allFiles.Length;
+                s.RemainingFilesSize = totalSize;
             });
 
             await ProcessDirectoryAsync(job.SourceDirectory, job.TargetDirectory, job);
 
-            _stateTracker.UpdateState(job.Name, s =>
-            {
-                s.State = "END";
-                s.SourceFilePath = "";
-                s.TargetFilePath = "";
-                s.TotalFilesToCopy = 0;
-                s.TotalFilesSize = 0;
-                s.NbFilesLeftToDo = 0;
-                s.Progression = 0;
-            });
+            _stateTracker.UpdateState(job.Name, s => { s.State = "END"; });
         }
 
         private async Task ProcessDirectoryAsync(string sourceDir, string targetDir, BackupJob job)
@@ -98,122 +66,76 @@ namespace EasySave.Services
 
             foreach (string file in Directory.GetFiles(sourceDir))
             {
-                string blockingSoftware = GetRunningBusinessSoftware();
-                if (blockingSoftware != null)
-                {
-                    throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{blockingSoftware}'.");
-                }
+                if (GetRunningBusinessSoftware() != null) throw new Exception("Interruption : Logiciel métier lancé.");
 
                 string targetFile = Path.Combine(targetDir, Path.GetFileName(file));
+                FileInfo fi = new FileInfo(file);
+
                 bool shouldCopy = true;
-
-                FileInfo sourceFileInfo = new FileInfo(file);
-
                 if (job.Type == BackupType.Differential && File.Exists(targetFile))
                 {
-                    if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
-                    {
-                        shouldCopy = false;
-                        _stateTracker.UpdateState(job.Name, s =>
-                        {
-                            s.NbFilesLeftToDo--;
-                            s.RemainingFilesSize -= sourceFileInfo.Length;
-                            s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
-                        });
-                    }
+                    if (fi.LastWriteTime <= new FileInfo(targetFile).LastWriteTime) shouldCopy = false;
                 }
 
-                if (shouldCopy) await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
+                if (shouldCopy) await CopyFileWithLoggingAsync(file, targetFile, job);
             }
 
-            foreach (string directory in Directory.GetDirectories(sourceDir))
+            foreach (string dir in Directory.GetDirectories(sourceDir))
             {
-                await ProcessDirectoryAsync(directory, Path.Combine(targetDir, Path.GetFileName(directory)), job);
+                await ProcessDirectoryAsync(dir, Path.Combine(targetDir, Path.GetFileName(dir)), job);
             }
         }
 
-        private async Task CopyFileWithLoggingAsync(string source, string target, string jobName, long fileSize)
+        private async Task CopyFileWithLoggingAsync(string source, string target, BackupJob job)
         {
-            _stateTracker.UpdateState(jobName, s =>
+            Stopwatch sw = new Stopwatch();
+            var settings = _configManager.LoadSettings();
+            bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>())
+                                 .Contains(Path.GetExtension(source).ToLower());
+
+            sw.Start();
+            if (shouldEncrypt)
             {
-                s.SourceFilePath = source;
-                s.TargetFilePath = target;
+                await Task.Run(() => ExecuteCryptoSoft(source, target));
+            }
+            else
+            {
+                await Task.Run(() => File.Copy(source, target, true));
+            }
+            sw.Stop();
+
+            long fileSize = new FileInfo(source).Length;
+
+            _stateTracker.UpdateState(job.Name, s =>
+            {
+                s.NbFilesLeftToDo--;
+                s.RemainingFilesSize -= fileSize;
+                s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
             });
 
-            Stopwatch stopwatch = new Stopwatch();
-            long timeMs = 0;
+            OnProgressUpdate?.Invoke(source, 0);
 
-            // Lecture des extensions à chiffrer
-            var settings = _configManager.LoadSettings();
-            List<string> encryptedExtensions = settings.EncryptedExtensions ?? new List<string>();
-            string fileExtension = Path.GetExtension(source).ToLower();
-            bool shouldEncrypt = encryptedExtensions.Contains(fileExtension);
-
-            try
-            {
-                stopwatch.Start();
-
-                if (shouldEncrypt)
-                {
-                    // --- CHIFFREMENT ---
-                    string cryptoSoftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
-
-                    if (File.Exists(cryptoSoftPath))
-                    {
-                        ProcessStartInfo startInfo = new ProcessStartInfo
-                        {
-                            FileName = cryptoSoftPath,
-                            Arguments = $"\"{source}\" \"{target}\"",
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        };
-
-                        using (Process process = Process.Start(startInfo))
-                        {
-                            process.WaitForExit();
-                            if (process.ExitCode != 0)
-                            {
-                                throw new Exception("Erreur d'exécution de CryptoSoft.");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        throw new FileNotFoundException("Exécutable CryptoSoft.exe introuvable.");
-                    }
-                }
-                else
-                {
-                    // --- COPIE STANDARD ---
-                    File.Copy(source, target, true);
-                }
-
-                stopwatch.Stop();
-                timeMs = stopwatch.ElapsedMilliseconds;
-
-                _stateTracker.UpdateState(jobName, s =>
-                {
-                    s.NbFilesLeftToDo--;
-                    s.RemainingFilesSize -= fileSize;
-                    s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
-                });
-
-                OnProgressUpdate?.Invoke(source, 0);
-            }
-            catch (Exception)
-            {
-                stopwatch.Stop();
-                timeMs = -1;
-            }
-
+            // Appel modifié pour inclure l'ID du job et le format de log
             await DailyLogger.Instance.WriteLogAsync(new LogEntry
             {
-                Name = jobName,
+                Name = job.Name,
                 FileSource = source,
                 FileTarget = target,
                 FileSize = fileSize,
-                FileTransferTime = timeMs
-            });
+                FileTransferTime = sw.ElapsedMilliseconds
+            }, job.Id.ToString(), settings.LogFormat);
+        }
+
+        private void ExecuteCryptoSoft(string source, string target)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
+            if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe manquant.");
+
+            ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\"")
+            { CreateNoWindow = true, UseShellExecute = false };
+
+            using Process p = Process.Start(psi);
+            p.WaitForExit();
         }
     }
 }
