@@ -1,0 +1,29 @@
+<UserControl x:Class="Graphic.Views.ProcessTab"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Liste des processus actifs" FontSize="24" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+
+        <ListBox Grid.Row="1" ItemsSource="{Binding Processes}" SelectedItem="{Binding SelectedProcess}"
+                 BorderBrush="#BDC3C7" BorderThickness="1" Background="White">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Name}" Padding="10" FontSize="14"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Button Grid.Row="2" Content="Arreter le processus" Command="{Binding StopProcessCommand}" 
+                HorizontalAlignment="Right" Margin="0,20,0,0" Padding="20,10" 
+                Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+    </Grid>
+</UserControl>
