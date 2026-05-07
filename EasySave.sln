@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine", "Engine\Engine.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasySave", "EasySave\EasySave.csproj", "{C3CA801E-4677-7201-D6C9-50918E0B83C0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EasyServer", "EasyServer\EasyServer.csproj", "{556AD771-E828-2D36-A6E5-DB2E83C7C2E0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{C3CA801E-4677-7201-D6C9-50918E0B83C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C3CA801E-4677-7201-D6C9-50918E0B83C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C3CA801E-4677-7201-D6C9-50918E0B83C0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{556AD771-E828-2D36-A6E5-DB2E83C7C2E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{556AD771-E828-2D36-A6E5-DB2E83C7C2E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{556AD771-E828-2D36-A6E5-DB2E83C7C2E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{556AD771-E828-2D36-A6E5-DB2E83C7C2E0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
