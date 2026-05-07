@@ -21,11 +21,14 @@ namespace Graphic
             var stateTracker = new StateTracker(appSettings.Jobs);
             var engine = new BackupEngine(stateTracker, configManager);
 
-            // 2. Création du ViewModel
-            _mainViewModel = new MainViewModel(configManager, stateTracker, engine);
+            // Initialisation du service réseau
+            var networkService = new NetworkService();
+
+            // 2. Création du ViewModel avec injection du service réseau
+            _mainViewModel = new MainViewModel(configManager, stateTracker, engine, networkService);
             this.DataContext = _mainViewModel;
 
-            // 3. On demande à vérifier les arguments du terminal UNE FOIS que la fenêtre est chargée
+            // 3. Vérification des arguments du terminal
             this.Loaded += MainWindow_Loaded;
         }
 
