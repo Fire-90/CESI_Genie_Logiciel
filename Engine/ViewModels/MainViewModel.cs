@@ -33,7 +33,6 @@ namespace EasySave.ViewModels
                 {
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
-
                     OnPropertyChanged(nameof(IsJobSelected));
 
                     (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -83,7 +82,7 @@ namespace EasySave.ViewModels
             }
         }
 
-        // NOUVEAU : Propriété gérant la chaîne d'extensions (ex: ".txt;.pdf")
+        // Propriété gérant la chaîne d'extensions (ex: ".txt;.pdf")
         public string EncryptedExtensionsString
         {
             get
@@ -95,11 +94,9 @@ namespace EasySave.ViewModels
             {
                 if (CurrentSettings != null)
                 {
-                    // Découpe la chaîne par rapport au ';' et nettoie les espaces éventuels
                     var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
                                           .Select(e => e.Trim())
                                           .ToList();
-
                     CurrentSettings.EncryptedExtensions = extensions;
                     OnPropertyChanged(nameof(EncryptedExtensionsString));
                 }
@@ -122,6 +119,30 @@ namespace EasySave.ViewModels
 
         public string SelectedSoftware { get; set; }
 
+        // --- PROPRIÉTÉS POUR LES PROCESSUS ---
+        private ObservableCollection<ProcessInfo> _processes;
+        public ObservableCollection<ProcessInfo> Processes
+        {
+            get => _processes;
+            set
+            {
+                _processes = value;
+                OnPropertyChanged(nameof(Processes));
+            }
+        }
+
+        private ProcessInfo _selectedProcess;
+        public ProcessInfo SelectedProcess
+        {
+            get => _selectedProcess;
+            set
+            {
+                _selectedProcess = value;
+                OnPropertyChanged(nameof(SelectedProcess));
+                (StopProcessCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            }
+        }
+
         // --- COMMANDES ---
         public ICommand AddJobCommand { get; }
         public ICommand ExecuteSelectionCommand { get; }
@@ -131,6 +152,8 @@ namespace EasySave.ViewModels
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
         public ICommand SaveSettingsCommand { get; }
+        public ICommand StopProcessCommand { get; }
+        public ICommand RefreshProcessesCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine)
         {
@@ -148,33 +171,27 @@ namespace EasySave.ViewModels
             }
 
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
+            Processes = new ObservableCollection<ProcessInfo>();
 
             _backupEngine.OnProgressUpdate += (file, remaining) => { CurrentFile = file; };
 
+            // Initialisation des commandes
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
-
             ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
-
-            AddSoftwareCommand = new RelayCommand(p =>
-            {
-                if (!string.IsNullOrWhiteSpace(NewSoftware) && !Softwares.Contains(NewSoftware))
-                {
-                    Softwares.Add(NewSoftware);
-                    NewSoftware = "";
-                }
-            });
-
-            RemoveSoftwareCommand = new RelayCommand(p =>
-            {
-                if (SelectedSoftware != null) Softwares.Remove(SelectedSoftware);
-            });
-
+            AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
+            RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
             SaveSettingsCommand = new RelayCommand(SaveSettings);
+            StopProcessCommand = new RelayCommand(ExecuteStopProcess, CanStopProcess);
+            RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
 
+            // Chargement initial de la langue
             ChangeLanguage(CurrentSettings.Language);
+
+            // Rafraîchissement initial des processus
+            ExecuteRefreshProcesses(null);
         }
 
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -185,9 +202,7 @@ namespace EasySave.ViewModels
         private void ChangeLanguage(object param)
         {
             string lang = param as string ?? "FR";
-
             CurrentSettings.Language = lang;
-
             CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
 
@@ -227,16 +242,16 @@ namespace EasySave.ViewModels
                     { "BtnAdd", "+ Ajouter un travail" },
                     { "BtnRun", "▶ Lancer la sélection" },
                     { "BtnDelete", "🗑 Supprimer" },
-                    { "Recent", "Activité récente :" },
+                    { "Recent", "Activit\u00e9 r\u00e9cente :" },
                     { "MsgEmptyPath", "❌ Erreur : Le dossier Source ou Cible est vide." },
-                    { "MsgSlotAdded", "✅ Nouveau travail vide ajouté." },
-                    { "MsgDeleted", "🗑️ Travail supprimé avec succès." },
-                    { "Settings", "⚙ Paramètres" },
+                    { "MsgSlotAdded", "✅ Nouveau travail vide ajout\u00e9." },
+                    { "MsgDeleted", "🗑️ Travail supprim\u00e9 avec succ\u00e8s." },
+                    { "Settings", "⚙ Param\u00e8tres" },
                     { "Close", "Fermer" },
-                    { "SaveSettings", "Enregistrer les paramètres" },
-                    { "Softwares", "Logiciels métier bloquants :" },
+                    { "SaveSettings", "Enregistrer les param\u00e8tres" },
+                    { "Softwares", "Logiciels m\u00e9tier bloquants :" },
                     { "LblLogFormat", "Format des logs :" },
-                    { "LblEncryptedExt", "Extensions à chiffrer (ex: .txt;.pdf) :" }
+                    { "LblEncryptedExt", "Extensions \u00e0 chiffrer (ex: .txt;.pdf) :" }
                 };
             }
         }
@@ -262,12 +277,9 @@ namespace EasySave.ViewModels
             };
 
             var newViewModel = new JobViewModel(newModel);
-
             newViewModel.PropertyChanged += OnJobPropertyChanged;
-
             Jobs.Add(newViewModel);
             SaveConfig();
-
             SelectedJob = newViewModel;
             CurrentFile = UIStrings["MsgSlotAdded"];
         }
@@ -277,7 +289,6 @@ namespace EasySave.ViewModels
             if (SelectedJob != null)
             {
                 SelectedJob.PropertyChanged -= OnJobPropertyChanged;
-
                 Jobs.Remove(SelectedJob);
                 SaveConfig();
                 CurrentFile = UIStrings["MsgDeleted"];
@@ -330,6 +341,83 @@ namespace EasySave.ViewModels
         {
             CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
+        }
+
+        private void ExecuteAddSoftware(object parameter)
+        {
+            if (!string.IsNullOrWhiteSpace(NewSoftware) && !Softwares.Contains(NewSoftware))
+            {
+                Softwares.Add(NewSoftware);
+                NewSoftware = "";
+            }
+        }
+
+        private void ExecuteRemoveSoftware(object parameter)
+        {
+            if (SelectedSoftware != null) Softwares.Remove(SelectedSoftware);
+        }
+
+        // --- GESTION DES PROCESSUS ---
+        private void ExecuteRefreshProcesses(object parameter)
+        {
+            try
+            {
+                var runningProcesses = System.Diagnostics.Process.GetProcesses()
+                    .Select(p => new ProcessInfo { Id = p.Id, Name = p.ProcessName })
+                    .ToList();
+
+                Processes.Clear();
+                foreach (var process in runningProcesses)
+                {
+                    Processes.Add(process);
+                }
+            }
+            catch (Exception ex)
+            {
+                CurrentFile = $"❌ Erreur lors du rafraîchissement des processus : {ex.Message}";
+            }
+        }
+
+        private bool CanStopProcess(object parameter) => SelectedProcess != null;
+
+        private void ExecuteStopProcess(object parameter)
+        {
+            if (SelectedProcess == null) return;
+
+            try
+            {
+                var process = System.Diagnostics.Process.GetProcessById(SelectedProcess.Id);
+                process.Kill();
+                process.WaitForExit();
+                CurrentFile = $"✅ Processus '{SelectedProcess.Name}' arrêté avec succès.";
+                ExecuteRefreshProcesses(null);
+            }
+            catch (Exception ex)
+            {
+                CurrentFile = $"❌ Erreur lors de l'arrêt du processus : {ex.Message}";
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged(string propertyName) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    // Classe pour représenter un processus
+    public class ProcessInfo : INotifyPropertyChanged
+    {
+        private int _id;
+        public int Id
+        {
+            get => _id;
+            set { _id = value; OnPropertyChanged(nameof(Id)); }
+        }
+
+        private string _name;
+        public string Name
+        {
+            get => _name;
+            set { _name = value; OnPropertyChanged(nameof(Name)); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
