@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using EasySave.Models;
@@ -16,7 +17,9 @@ namespace EasySave.ViewModels
         private readonly BackupEngine _backupEngine;
         private readonly StateTracker _stateTracker;
 
-        // --- PROPRIÉTÉS DES TRAVAUX ---
+        // Context used to safely update the UI thread from background tasks
+        private readonly SynchronizationContext _uiContext;
+
         public ObservableCollection<JobViewModel> Jobs { get; }
 
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
@@ -33,7 +36,6 @@ namespace EasySave.ViewModels
                 {
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
-
                     OnPropertyChanged(nameof(IsJobSelected));
 
                     (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -63,7 +65,6 @@ namespace EasySave.ViewModels
             set { _uiStrings = value; OnPropertyChanged(nameof(UIStrings)); }
         }
 
-        // --- PROPRIÉTÉS DES PARAMÈTRES ---
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
 
@@ -83,7 +84,6 @@ namespace EasySave.ViewModels
             }
         }
 
-        // NOUVEAU : Propriété gérant la chaîne d'extensions (ex: ".txt;.pdf")
         public string EncryptedExtensionsString
         {
             get
@@ -95,7 +95,6 @@ namespace EasySave.ViewModels
             {
                 if (CurrentSettings != null)
                 {
-                    // Découpe la chaîne par rapport au ';' et nettoie les espaces éventuels
                     var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
                                           .Select(e => e.Trim())
                                           .ToList();
@@ -122,7 +121,6 @@ namespace EasySave.ViewModels
 
         public string SelectedSoftware { get; set; }
 
-        // --- COMMANDES ---
         public ICommand AddJobCommand { get; }
         public ICommand ExecuteSelectionCommand { get; }
         public ICommand DeleteJobCommand { get; }
@@ -138,6 +136,8 @@ namespace EasySave.ViewModels
             _stateTracker = stateTracker;
             _backupEngine = backupEngine;
 
+            _uiContext = SynchronizationContext.Current;
+
             CurrentSettings = _configManager.LoadSettings();
 
             Jobs = new ObservableCollection<JobViewModel>(CurrentSettings.Jobs.Select(j => new JobViewModel(j)));
@@ -151,8 +151,20 @@ namespace EasySave.ViewModels
 
             _backupEngine.OnProgressUpdate += (file, remaining) => { CurrentFile = file; };
 
+            _backupEngine.OnJobProgress += (jobName, progress) =>
+            {
+                if (_uiContext != null)
+                {
+                    _uiContext.Post(_ =>
+                    {
+                        var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
+                        if (jobVm != null) jobVm.Progress = progress;
+                    }, null);
+                }
+            };
+
             AddJobCommand = new RelayCommand(ExecuteAddJob);
-            ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
+            ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
 
@@ -179,12 +191,18 @@ namespace EasySave.ViewModels
 
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            // Ignore UI-only property changes to prevent recursive save operations
+            if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected")
+            {
+                return;
+            }
+
             SaveConfig();
         }
 
         private void ChangeLanguage(object param)
         {
-            string lang = param as string ?? "FR";
+            string lang = param as string ?? "EN";
 
             CurrentSettings.Language = lang;
 
@@ -289,23 +307,34 @@ namespace EasySave.ViewModels
 
         private async void ExecuteSelectedJob(object parameter)
         {
-            if (SelectedJob == null) return;
+            var jobsToRun = Jobs.Where(j => j.IsSelected).ToList();
 
-            if (string.IsNullOrWhiteSpace(SelectedJob.SourceDirectory) || string.IsNullOrWhiteSpace(SelectedJob.TargetDirectory))
+            if (!jobsToRun.Any())
             {
-                CurrentFile = UIStrings["MsgEmptyPath"];
+                CurrentFile = "⚠️ Please select at least one job using the checkboxes.";
                 return;
             }
 
             try
             {
-                CurrentFile = "⏳ Démarrage de la sauvegarde...";
-                await _backupEngine.ExecuteJobAsync(SelectedJob.Model);
-                CurrentFile = "✅ Sauvegarde terminée avec succès !";
+                CurrentFile = "⏳ Starting background backups...";
+                var tasks = new List<Task>();
+
+                foreach (var jobVm in jobsToRun)
+                {
+                    if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
+
+                    jobVm.Progress = 0;
+
+                    tasks.Add(Task.Run(() => _backupEngine.ExecuteJobAsync(jobVm.Model)));
+                }
+
+                await Task.WhenAll(tasks);
+                CurrentFile = "✅ All selected backups completed successfully!";
             }
             catch (Exception ex)
             {
-                CurrentFile = $"❌ Erreur : {ex.Message}";
+                CurrentFile = $"❌ Error: {ex.Message}";
             }
         }
 
@@ -313,17 +342,26 @@ namespace EasySave.ViewModels
         {
             try
             {
-                CurrentFile = "⏳ Démarrage des sauvegardes demandées...";
+                CurrentFile = "⏳ Starting requested backups...";
+                var tasks = new List<Task>();
+
                 foreach (var id in ids)
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
-                    await _backupEngine.ExecuteJobAsync(jobVm.Model);
+                    jobVm.Progress = 0;
+
+                    tasks.Add(Task.Run(() => _backupEngine.ExecuteJobAsync(jobVm.Model)));
                 }
-                CurrentFile = "✅ Toutes les sauvegardes sont terminées avec succès !";
+
+                await Task.WhenAll(tasks);
+                CurrentFile = "✅ All backups completed successfully!";
             }
-            catch (Exception ex) { CurrentFile = $"❌ Erreur : {ex.Message}"; }
+            catch (Exception ex)
+            {
+                CurrentFile = $"❌ Error: {ex.Message}";
+            }
         }
 
         public void SaveConfig()
