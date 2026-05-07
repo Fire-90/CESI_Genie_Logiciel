@@ -15,12 +15,11 @@ namespace EasySave.ViewModels
         private readonly ConfigManager _configManager;
         private readonly BackupEngine _backupEngine;
         private readonly StateTracker _stateTracker;
+        private readonly NetworkService _networkService;
 
         // --- PROPRIÉTÉS DES TRAVAUX ---
         public ObservableCollection<JobViewModel> Jobs { get; }
-
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
-
         public bool IsJobSelected => SelectedJob != null;
 
         private JobViewModel _selectedJob;
@@ -34,7 +33,6 @@ namespace EasySave.ViewModels
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
                     OnPropertyChanged(nameof(IsJobSelected));
-
                     (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
                     (DeleteJobCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
@@ -65,7 +63,6 @@ namespace EasySave.ViewModels
         // --- PROPRIÉTÉS DES PARAMÈTRES ---
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
-
         public List<string> AvailableLogFormats { get; } = new List<string> { "JSON", "XML" };
 
         public string SelectedLogFormat
@@ -85,11 +82,7 @@ namespace EasySave.ViewModels
         // Propriété gérant la chaîne d'extensions (ex: ".txt;.pdf")
         public string EncryptedExtensionsString
         {
-            get
-            {
-                if (CurrentSettings?.EncryptedExtensions == null) return "";
-                return string.Join(";", CurrentSettings.EncryptedExtensions);
-            }
+            get => CurrentSettings?.EncryptedExtensions == null ? "" : string.Join(";", CurrentSettings.EncryptedExtensions);
             set
             {
                 if (CurrentSettings != null)
@@ -155,14 +148,14 @@ namespace EasySave.ViewModels
         public ICommand StopProcessCommand { get; }
         public ICommand RefreshProcessesCommand { get; }
 
-        public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine)
+        public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
         {
             _configManager = configManager;
             _stateTracker = stateTracker;
             _backupEngine = backupEngine;
+            _networkService = networkService;
 
             CurrentSettings = _configManager.LoadSettings();
-
             Jobs = new ObservableCollection<JobViewModel>(CurrentSettings.Jobs.Select(j => new JobViewModel(j)));
 
             foreach (var job in Jobs)
@@ -173,9 +166,25 @@ namespace EasySave.ViewModels
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
             Processes = new ObservableCollection<ProcessInfo>();
 
-            _backupEngine.OnProgressUpdate += (file, remaining) => { CurrentFile = file; };
+            // Écoute de la progression classique
+            _backupEngine.OnProgressUpdate += (file, remaining) =>
+            {
+                CurrentFile = file;
+                _networkService.SendMessage($"[PROGRESS] {file}");
+            };
 
-            // Initialisation des commandes
+            // Écoute des logs générés pour envoi immédiat au serveur
+            EasyLog.DailyLogger.OnLogGenerated += (jobId, format, entry) =>
+            {
+                try
+                {
+                    string jsonLog = System.Text.Json.JsonSerializer.Serialize(entry);
+                    // On préfixe avec [LOG] suivi des méta-données
+                    _networkService.SendMessage($"[LOG]|{jobId}|{format}|{jsonLog}");
+                }
+                catch { }
+            };
+
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
@@ -194,10 +203,7 @@ namespace EasySave.ViewModels
             ExecuteRefreshProcesses(null);
         }
 
-        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            SaveConfig();
-        }
+        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e) => SaveConfig();
 
         private void ChangeLanguage(object param)
         {
@@ -267,15 +273,7 @@ namespace EasySave.ViewModels
         private void ExecuteAddJob(object parameter)
         {
             int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1;
-            var newModel = new BackupJob
-            {
-                Id = newId,
-                Name = $"Save {newId}",
-                SourceDirectory = "",
-                TargetDirectory = "",
-                Type = BackupType.Full
-            };
-
+            var newModel = new BackupJob { Id = newId, Name = $"Save {newId}", SourceDirectory = "", TargetDirectory = "", Type = BackupType.Full };
             var newViewModel = new JobViewModel(newModel);
             newViewModel.PropertyChanged += OnJobPropertyChanged;
             Jobs.Add(newViewModel);
@@ -311,12 +309,17 @@ namespace EasySave.ViewModels
             try
             {
                 CurrentFile = "⏳ Démarrage de la sauvegarde...";
+                _networkService.SendMessage($"[START] {SelectedJob.Name}");
+
                 await _backupEngine.ExecuteJobAsync(SelectedJob.Model);
+
                 CurrentFile = "✅ Sauvegarde terminée avec succès !";
+                _networkService.SendMessage($"[END] {SelectedJob.Name} - Succès");
             }
             catch (Exception ex)
             {
                 CurrentFile = $"❌ Erreur : {ex.Message}";
+                _networkService.SendMessage($"[ERROR] {SelectedJob.Name} : {ex.Message}");
             }
         }
 
@@ -330,11 +333,17 @@ namespace EasySave.ViewModels
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
+                    _networkService.SendMessage($"[START] {jobVm.Name}");
                     await _backupEngine.ExecuteJobAsync(jobVm.Model);
+                    _networkService.SendMessage($"[END] {jobVm.Name} - Succès");
                 }
                 CurrentFile = "✅ Toutes les sauvegardes sont terminées avec succès !";
             }
-            catch (Exception ex) { CurrentFile = $"❌ Erreur : {ex.Message}"; }
+            catch (Exception ex)
+            {
+                CurrentFile = $"❌ Erreur : {ex.Message}";
+                _networkService.SendMessage($"[ERROR] Erreur globale : {ex.Message}");
+            }
         }
 
         public void SaveConfig()
@@ -421,7 +430,6 @@ namespace EasySave.ViewModels
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
