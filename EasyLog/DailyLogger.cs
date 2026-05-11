@@ -122,7 +122,8 @@ namespace EasyLog
             string filePath = Path.Combine(logDirectory, fileName);
             List<LogEntry> logs = new List<LogEntry>();
 
-            if (File.Exists(filePath))
+            int maxRetries = 5;
+            for (int r = 0; r < maxRetries; r++)
             {
                 try
                 {
@@ -147,7 +148,8 @@ namespace EasyLog
             List<LogEntry> logs = new List<LogEntry>();
             XmlSerializer serializer = new XmlSerializer(typeof(List<LogEntry>));
 
-            if (File.Exists(filePath))
+            int maxRetries = 5;
+            for (int r = 0; r < maxRetries; r++)
             {
                 try
                 {

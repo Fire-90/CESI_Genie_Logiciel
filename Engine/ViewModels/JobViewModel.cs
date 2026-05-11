@@ -76,6 +76,20 @@ namespace EasySave.ViewModels
             set { _progress = value; OnPropertyChanged(nameof(Progress)); }
         }
 
+        private bool _isRunning;
+        public bool IsRunning
+        {
+            get => _isRunning;
+            set { _isRunning = value; OnPropertyChanged(nameof(IsRunning)); }
+        }
+
+        private bool _isPaused;
+        public bool IsPaused
+        {
+            get => _isPaused;
+            set { _isPaused = value; OnPropertyChanged(nameof(IsPaused)); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) =>
           PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

@@ -186,6 +186,11 @@ namespace EasySave.ViewModels
         public ICommand StopProcessCommand { get; }
         public ICommand RefreshProcessesCommand { get; }
 
+        // Team feature (Pause / Resume / Stop jobs via the DataGrid buttons)
+        public ICommand PauseJobCommand { get; }
+        public ICommand ResumeJobCommand { get; }
+        public ICommand StopJobCommand { get; }
+
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
         {
             _configManager = configManager;
@@ -243,7 +248,12 @@ namespace EasySave.ViewModels
             StopProcessCommand = new RelayCommand(ExecuteStopProcess, CanStopProcess);
             RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
 
-            LanguageService.CurrentLanguage = CurrentSettings.Language;
+            // Job controls
+            PauseJobCommand = new RelayCommand(ExecutePauseJob);
+            ResumeJobCommand = new RelayCommand(ExecuteResumeJob);
+            StopJobCommand = new RelayCommand(ExecuteStopJob);
+
+            this.LanguageService.CurrentLanguage = CurrentSettings.Language;
             ExecuteRefreshProcesses(null);
         }
 
@@ -288,7 +298,7 @@ namespace EasySave.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Action showErrorAction = () => CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
+                    Action showErrorAction = () => CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
                     if (_syncContext != null) _syncContext.Post(_ => showErrorAction(), null);
                     else showErrorAction();
                 }
@@ -307,7 +317,7 @@ namespace EasySave.ViewModels
             CurrentSettings.Language = lang;
             CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
-            LanguageService.CurrentLanguage = lang;
+            this.LanguageService.CurrentLanguage = lang;
         }
 
         private void SaveSettings(object parameter)
@@ -327,7 +337,7 @@ namespace EasySave.ViewModels
             Jobs.Add(newViewModel);
             SaveConfig();
             SelectedJob = newViewModel;
-            CurrentFile = LanguageService["MsgSlotAdded"];
+            CurrentFile = this.LanguageService["MsgSlotAdded"];
         }
 
         private void ExecuteDeleteJob(object parameter)
@@ -337,25 +347,26 @@ namespace EasySave.ViewModels
                 SelectedJob.PropertyChanged -= OnJobPropertyChanged;
                 Jobs.Remove(SelectedJob);
                 SaveConfig();
-                CurrentFile = LanguageService["MsgDeleted"];
+                CurrentFile = this.LanguageService["MsgDeleted"];
                 SelectedJob = null;
             }
         }
 
         private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
 
+        // Corrected block. Setting IsRunning to trigger the XAML UI visibility.
         private async void ExecuteSelectedJob(object parameter)
         {
             var jobsToRun = Jobs.Where(j => j.IsSelected).ToList();
             if (!jobsToRun.Any())
             {
-                CurrentFile = LanguageService["MsgEmptyPath"];
+                CurrentFile = this.LanguageService["MsgEmptyPath"];
                 return;
             }
 
             try
             {
-                CurrentFile = LanguageService["MsgStartGlobal"];
+                CurrentFile = this.LanguageService["MsgStartGlobal"];
                 var tasks = new List<Task>();
 
                 foreach (var jobVm in jobsToRun)
@@ -363,9 +374,10 @@ namespace EasySave.ViewModels
                     if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
                     jobVm.Progress = 0;
+                    jobVm.IsRunning = true;   // Activates the Action buttons in XAML
+                    jobVm.IsPaused = false;
                     _networkService.SendMessage($"[START] {jobVm.Name}");
 
-                    // Offload execution to a background thread
                     tasks.Add(Task.Run(async () =>
                     {
                         try
@@ -375,29 +387,32 @@ namespace EasySave.ViewModels
                         }
                         catch (Exception ex)
                         {
-                            // Route blocking exceptions through the Language Service
                             string errorMsg = (ex is InvalidOperationException && ex.Message.StartsWith("BLOCKING|"))
-                                ? $"{LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
-                                : $"{LanguageService["MsgError"]} {ex.Message}";
+                                ? $"{this.LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
+                                : $"{this.LanguageService["MsgError"]} {ex.Message}";
 
                             _uiContext?.Post(_ => CurrentFile = errorMsg, null);
                             _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                        }
+                        finally
+                        {
+                            // Close UI buttons once execution finishes or crashes
+                            jobVm.IsRunning = false;
+                            jobVm.IsPaused = false;
                         }
                     }));
                 }
 
                 await Task.WhenAll(tasks);
 
-                // Do not overwrite errors with success if tasks failed. 
-                // Only show global success if the current file message isn't already an error.
                 if (!CurrentFile.Contains("❌"))
                 {
-                    CurrentFile = LanguageService["MsgSuccessGlobal"];
+                    CurrentFile = this.LanguageService["MsgSuccessGlobal"];
                 }
             }
             catch (Exception ex)
             {
-                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
+                CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
                 _networkService.SendMessage($"[ERROR] Global error: {ex.Message}");
             }
         }
@@ -406,7 +421,7 @@ namespace EasySave.ViewModels
         {
             try
             {
-                CurrentFile = LanguageService["MsgStartGlobal"];
+                CurrentFile = this.LanguageService["MsgStartGlobal"];
                 var tasks = new List<Task>();
 
                 foreach (var id in ids)
@@ -415,6 +430,8 @@ namespace EasySave.ViewModels
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
                     jobVm.Progress = 0;
+                    jobVm.IsRunning = true;
+                    jobVm.IsPaused = false;
                     _networkService.SendMessage($"[START] {jobVm.Name}");
 
                     tasks.Add(Task.Run(async () =>
@@ -427,11 +444,16 @@ namespace EasySave.ViewModels
                         catch (Exception ex)
                         {
                             string errorMsg = (ex is InvalidOperationException && ex.Message.StartsWith("BLOCKING|"))
-                                ? $"{LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
-                                : $"{LanguageService["MsgError"]} {ex.Message}";
+                                ? $"{this.LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
+                                : $"{this.LanguageService["MsgError"]} {ex.Message}";
 
                             _uiContext?.Post(_ => CurrentFile = errorMsg, null);
                             _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                        }
+                        finally
+                        {
+                            jobVm.IsRunning = false;
+                            jobVm.IsPaused = false;
                         }
                     }));
                 }
@@ -440,13 +462,42 @@ namespace EasySave.ViewModels
 
                 if (!CurrentFile.Contains("❌"))
                 {
-                    CurrentFile = LanguageService["MsgSuccessGlobal"];
+                    CurrentFile = this.LanguageService["MsgSuccessGlobal"];
                 }
             }
             catch (Exception ex)
             {
-                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
+                CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
                 _networkService.SendMessage($"[ERROR] Global error: {ex.Message}");
+            }
+        }
+
+        // Job Control Logics
+        private void ExecutePauseJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.PauseJob(job.Name);
+                job.IsPaused = true; // Switches the Pause button to a Resume button visually
+            }
+        }
+
+        private void ExecuteResumeJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.ResumeJob(job.Name);
+                job.IsPaused = false;
+            }
+        }
+
+        private void ExecuteStopJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.StopJob(job.Name);
+                job.IsRunning = false;
+                job.IsPaused = false;
             }
         }
 
@@ -485,7 +536,7 @@ namespace EasySave.ViewModels
             }
             catch (Exception ex)
             {
-                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
+                CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
             }
         }
 
@@ -504,7 +555,7 @@ namespace EasySave.ViewModels
             }
             catch (Exception ex)
             {
-                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
+                CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
             }
         }
 

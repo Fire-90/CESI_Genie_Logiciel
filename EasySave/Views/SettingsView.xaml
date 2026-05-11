@@ -28,18 +28,32 @@
                         <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat}" Height="35" Margin="0,0,0,25"/>
 
                         <TextBlock Text="{Binding LanguageService[LblEncryptedExt]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <TextBox Text="{Binding EncryptedExtensionsString}" Height="35"/>
+                        <TextBox Text="{Binding EncryptedExtensionsString}" Height="35" Margin="0,0,0,25" Padding="5" VerticalContentAlignment="Center"/>
+
+                        <TextBlock Text="{Binding LanguageService[LblPriorityExt]}" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="#34495E"/>
+                        <TextBox Text="{Binding PriorityExtensionsString, UpdateSourceTrigger=PropertyChanged}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
                         <TextBlock Text="{Binding LanguageService[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                        <ListBox ItemsSource="{Binding Softwares}" Height="130" Margin="0,0,0,10"/>
-                        <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" HorizontalAlignment="Right"/>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding NewSoftware, UpdateSourceTrigger=PropertyChanged}" Height="35" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
+                            <Button Grid.Column="1" Content="+" Command="{Binding AddSoftwareCommand}" Width="40" Background="#3498DB" Foreground="White" FontSize="18" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+                        </Grid>
+
+                        <ListBox ItemsSource="{Binding Softwares}" SelectedItem="{Binding SelectedSoftware}" Height="140" Margin="0,0,0,10" Padding="5" BorderBrush="#BDC3C7"/>
+
+                        <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" Padding="15,5" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" HorizontalAlignment="Right" Cursor="Hand"/>
                     </StackPanel>
                 </Grid>
 
                 <Separator Margin="0,30,0,20"/>
-                <Button Content="{Binding LanguageService[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Background="#2ECC71" Foreground="White" Padding="30,12" HorizontalAlignment="Right"/>
+                <Button Content="{Binding LanguageService[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Background="#2ECC71" Foreground="White" Padding="30,12" HorizontalAlignment="Right" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
             </StackPanel>
         </Border>
     </Grid>
