@@ -14,59 +14,10 @@
             <TabItem Header="Processus">
                 <views:ProcessTab />
             </TabItem>
+
+            <TabItem Header="Paramètres">
+                <views:SettingsView />
+            </TabItem>
         </TabControl>
-
-        <Border Background="#D8F4F6F9" Panel.ZIndex="10">
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
-                            <Setter Property="Visibility" Value="Visible"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-
-            <Border Background="White" CornerRadius="10" Padding="30" Width="450" VerticalAlignment="Center" HorizontalAlignment="Center">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="15" Opacity="0.3" ShadowDepth="4"/>
-                </Border.Effect>
-
-                <StackPanel>
-                    <TextBlock Text="{Binding UIStrings[Settings]}" FontSize="24" FontWeight="Bold" Margin="0,0,0,20" Foreground="#2C3E50"/>
-
-                    <TextBlock Text="{Binding UIStrings[LblLogFormat]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
-                    <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat, Mode=TwoWay}" Height="30" Padding="5" Margin="0,0,0,15" VerticalContentAlignment="Center"/>
-
-                    <TextBlock Text="{Binding UIStrings[LblEncryptedExt]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
-                    <TextBox Text="{Binding EncryptedExtensionsString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" Margin="0,0,0,15" VerticalContentAlignment="Center"/>
-
-                    <TextBlock Text="{Binding UIStrings[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,5" Foreground="#34495E"/>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0" Text="{Binding NewSoftware, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
-                        <Button Grid.Column="1" Content="+" Command="{Binding AddSoftwareCommand}" Width="35" Background="#3498DB" Foreground="White" FontSize="18" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                    </Grid>
-
-                    <ListBox ItemsSource="{Binding Softwares}" SelectedItem="{Binding SelectedSoftware}" Height="100" Margin="0,0,0,10" Padding="5" BorderBrush="#BDC3C7"/>
-
-                    <Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" Padding="15,5" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Margin="0,0,0,25" HorizontalAlignment="Right" Cursor="Hand"/>
-
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="{Binding UIStrings[Close]}" Command="{Binding ToggleSettingsCommand}" Padding="15,10" Margin="0,0,10,0" Background="#95A5A6" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                        <Button Grid.Column="1" Content="{Binding UIStrings[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
-        </Border>
     </Grid>
 </Window>

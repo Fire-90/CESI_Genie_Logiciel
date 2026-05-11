@@ -52,7 +52,7 @@ namespace Graphic
             }
         }
 
-        // Ton ancienne méthode de parsing récupérée de la Console !
+        
         private List<int> ParseArgs(string arg)
         {
             var ids = new List<int>();
