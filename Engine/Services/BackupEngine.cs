@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,14 +21,38 @@ namespace EasySave.Services
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
 
-        // Global counter for priority files across all threads (Barrier concept)
+        // Your work: Global counter for priority files across all threads (Barrier concept)
         private static int GlobalPriorityFilesCount = 0;
+
+        // Teammate's work: Thread control for Pause and Stop
+        private readonly ConcurrentDictionary<string, ManualResetEvent> _jobPauseEvents = new();
+        private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellationTokens = new();
 
         public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
         {
             _stateTracker = stateTracker;
             _configManager = configManager;
         }
+
+        // --- TEAMMATE'S FEATURE: PAUSE / RESUME / STOP ---
+
+        public void PauseJob(string jobName)
+        {
+            if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent)) pauseEvent.Reset();
+        }
+
+        public void ResumeJob(string jobName)
+        {
+            if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent)) pauseEvent.Set();
+        }
+
+        public void StopJob(string jobName)
+        {
+            if (_jobCancellationTokens.TryGetValue(jobName, out var cts)) cts.Cancel();
+            ResumeJob(jobName); // Force resume to allow the thread to reach the cancellation token and die
+        }
+
+        // -------------------------------------------------
 
         private string GetRunningBusinessSoftware()
         {
@@ -47,11 +72,15 @@ namespace EasySave.Services
         public async Task ExecuteJobAsync(BackupJob job)
         {
             string blocking = GetRunningBusinessSoftware();
-
-            // Throw a specifically formatted exception for the ViewModel to translate
             if (blocking != null) throw new InvalidOperationException($"BLOCKING|{blocking}");
 
             if (!Directory.Exists(job.SourceDirectory)) throw new DirectoryNotFoundException("Source directory not found.");
+
+            // Initialize Thread Controls for this specific job
+            var cts = new CancellationTokenSource();
+            var pauseEvent = new ManualResetEvent(true);
+            _jobCancellationTokens[job.Name] = cts;
+            _jobPauseEvents[job.Name] = pauseEvent;
 
             string[] allFiles = Directory.GetFiles(job.SourceDirectory, "*.*", SearchOption.AllDirectories);
             var settings = _configManager.LoadSettings();
@@ -90,6 +119,9 @@ namespace EasySave.Services
                 // Step 1: Priority files
                 foreach (string file in priorityFiles)
                 {
+                    pauseEvent.WaitOne(); // Wait here if job is paused
+                    cts.Token.ThrowIfCancellationRequested(); // Stop here if job is cancelled
+
                     await ProcessSingleFileAsync(file, job);
                     Interlocked.Decrement(ref GlobalPriorityFilesCount);
                 }
@@ -97,16 +129,30 @@ namespace EasySave.Services
                 // Step 2: Normal files (Barrier)
                 foreach (string file in normalFiles)
                 {
+                    // Global Barrier: Wait for all priority files across ALL threads
                     while (Interlocked.CompareExchange(ref GlobalPriorityFilesCount, 0, 0) > 0)
                     {
+                        cts.Token.ThrowIfCancellationRequested(); // Allow cancellation even while waiting at the barrier
                         await Task.Delay(200);
                     }
+
+                    pauseEvent.WaitOne();
+                    cts.Token.ThrowIfCancellationRequested();
 
                     await ProcessSingleFileAsync(file, job);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Job was manually stopped by user
+                throw new Exception("Job stopped manually.");
+            }
             finally
             {
+                // Clean up memory and reset state
+                _jobCancellationTokens.TryRemove(job.Name, out _);
+                _jobPauseEvents.TryRemove(job.Name, out _);
+
                 lock (_stateLock)
                 {
                     _stateTracker.UpdateState(job.Name, s =>
@@ -127,8 +173,6 @@ namespace EasySave.Services
         private async Task ProcessSingleFileAsync(string file, BackupJob job)
         {
             string currentBlockingSoftware = GetRunningBusinessSoftware();
-
-            // Check blocking software at the individual file level
             if (currentBlockingSoftware != null) throw new InvalidOperationException($"BLOCKING|{currentBlockingSoftware}");
 
             string relativePath = Path.GetRelativePath(job.SourceDirectory, file);

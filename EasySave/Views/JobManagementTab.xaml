@@ -84,6 +84,63 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Actions" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+
+                                <Button Command="{Binding DataContext.PauseJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#F1C40F" BorderThickness="0" Cursor="Hand" ToolTip="Pause">
+                                    <Button.Content>
+                                        <Path Data="M 2,0 L 4,0 L 4,10 L 2,10 Z M 6,0 L 8,0 L 8,10 L 6,10 Z" Fill="White" Stretch="Uniform" Width="8" Height="10"/>
+                                    </Button.Content>
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+
+                                <Button Command="{Binding DataContext.ResumeJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#2ECC71" BorderThickness="0" Cursor="Hand" ToolTip="Resume">
+                                    <Button.Content>
+                                        <Path Data="M 0,0 L 10,5 L 0,10 Z" Fill="White" Stretch="Uniform" Width="10" Height="10"/>
+                                    </Button.Content>
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+
+                                <Button Command="{Binding DataContext.StopJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#E74C3C" BorderThickness="0" Cursor="Hand" ToolTip="Stop">
+                                    <Button.Content>
+                                        <Path Data="M 0,0 L 10,0 L 10,10 L 0,10 Z" Fill="White" Stretch="Uniform" Width="10" Height="10"/>
+                                    </Button.Content>
+                                </Button>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
@@ -98,22 +155,22 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,15,10" IsEnabled="{Binding IsJobSelected}">
+            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,15,10">
                 <TextBlock Text="{Binding LanguageService[LblName]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
                 <TextBox Text="{Binding SelectedJob.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
             </StackPanel>
 
-            <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,10" IsEnabled="{Binding IsJobSelected}">
+            <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,10">
                 <TextBlock Text="{Binding LanguageService[LblType]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
                 <ComboBox ItemsSource="{Binding AvailableTypes}" SelectedItem="{Binding SelectedJob.Type, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
             </StackPanel>
 
-            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,20" IsEnabled="{Binding IsJobSelected}">
+            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,20">
                 <TextBlock Text="{Binding LanguageService[LblSource]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
                 <TextBox Text="{Binding SelectedJob.SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
             </StackPanel>
 
-            <StackPanel Grid.Row="1" Grid.Column="1" Margin="15,0,0,20" IsEnabled="{Binding IsJobSelected}">
+            <StackPanel Grid.Row="1" Grid.Column="1" Margin="15,0,0,20">
                 <TextBlock Text="{Binding LanguageService[LblTarget]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
                 <TextBox Text="{Binding SelectedJob.TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
             </StackPanel>
