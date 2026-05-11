@@ -7,17 +7,28 @@
         Background="#F4F6F9">
     <Grid>
         <TabControl Background="Transparent" BorderThickness="0">
-            <TabItem Header="Gestion des Jobs">
+
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="{Binding DataContext.UIStrings[TabJobs], RelativeSource={RelativeSource AncestorType=Window}}" />
+                </TabItem.Header>
                 <views:JobManagementTab />
             </TabItem>
 
-            <TabItem Header="Processus">
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="{Binding DataContext.UIStrings[TabProcesses], RelativeSource={RelativeSource AncestorType=Window}}" />
+                </TabItem.Header>
                 <views:ProcessTab />
             </TabItem>
 
-            <TabItem Header="Paramètres">
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="{Binding DataContext.UIStrings[TabSettings], RelativeSource={RelativeSource AncestorType=Window}}" />
+                </TabItem.Header>
                 <views:SettingsView />
             </TabItem>
+
         </TabControl>
     </Grid>
 </Window>
