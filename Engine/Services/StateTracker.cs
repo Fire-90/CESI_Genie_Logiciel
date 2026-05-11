@@ -100,7 +100,21 @@ namespace EasySave.Services
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
             string jsonString = JsonSerializer.Serialize(_currentStates, options);
-            File.WriteAllText(_stateFilePath, jsonString);
+
+            int maxRetries = 5;
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    File.WriteAllText(_stateFilePath, jsonString);
+                    break;
+                }
+                catch (IOException)
+                {
+                    if (i == maxRetries - 1) throw;
+                    System.Threading.Thread.Sleep(50);
+                }
+            }
         }
     }
 }

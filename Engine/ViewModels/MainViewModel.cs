@@ -20,6 +20,9 @@ namespace EasySave.ViewModels
         // Context used to safely update the UI thread from background tasks
         private readonly SynchronizationContext _uiContext;
 
+        private DateTime _lastFileUpdate = DateTime.MinValue;
+        private DateTime _lastProgressUpdate = DateTime.MinValue;
+
         public ObservableCollection<JobViewModel> Jobs { get; }
 
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
@@ -38,7 +41,6 @@ namespace EasySave.ViewModels
                     OnPropertyChanged(nameof(SelectedJob));
                     OnPropertyChanged(nameof(IsJobSelected));
 
-                    (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
                     (DeleteJobCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
@@ -122,7 +124,8 @@ namespace EasySave.ViewModels
         public string SelectedSoftware { get; set; }
 
         public ICommand AddJobCommand { get; }
-        public ICommand ExecuteSelectionCommand { get; }
+        public ICommand ExecuteJobCommand { get; }
+        public ICommand PauseJobCommand { get; }
         public ICommand DeleteJobCommand { get; }
         public ICommand ChangeLanguageCommand { get; }
         public ICommand ToggleSettingsCommand { get; }
@@ -149,22 +152,37 @@ namespace EasySave.ViewModels
 
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
 
-            _backupEngine.OnProgressUpdate += (file, remaining) => { CurrentFile = file; };
+            _backupEngine.OnProgressUpdate += (file, remaining) =>
+            {
+                if ((DateTime.Now - _lastFileUpdate).TotalMilliseconds > 50)
+                {
+                    _lastFileUpdate = DateTime.Now;
+                    if (_uiContext != null)
+                    {
+                        _uiContext.Post(_ => { CurrentFile = file; }, null);
+                    }
+                }
+            };
 
             _backupEngine.OnJobProgress += (jobName, progress) =>
             {
-                if (_uiContext != null)
+                if (progress == 0 || progress == 100 || (DateTime.Now - _lastProgressUpdate).TotalMilliseconds > 50)
                 {
-                    _uiContext.Post(_ =>
+                    _lastProgressUpdate = DateTime.Now;
+                    if (_uiContext != null)
                     {
-                        var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
-                        if (jobVm != null) jobVm.Progress = progress;
-                    }, null);
+                        _uiContext.Post(_ =>
+                        {
+                            var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
+                            if (jobVm != null) jobVm.Progress = progress;
+                        }, null);
+                    }
                 }
             };
 
             AddJobCommand = new RelayCommand(ExecuteAddJob);
-            ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob);
+            ExecuteJobCommand = new RelayCommand(ExecuteJob);
+            PauseJobCommand = new RelayCommand(TogglePauseJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
 
@@ -305,36 +323,54 @@ namespace EasySave.ViewModels
 
         private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
 
-        private async void ExecuteSelectedJob(object parameter)
+        private async void ExecuteJob(object parameter)
         {
-            var jobsToRun = Jobs.Where(j => j.IsSelected).ToList();
-
-            if (!jobsToRun.Any())
+            if (parameter is JobViewModel jobVm)
             {
-                CurrentFile = "⚠️ Please select at least one job using the checkboxes.";
-                return;
-            }
-
-            try
-            {
-                CurrentFile = "⏳ Starting background backups...";
-                var tasks = new List<Task>();
-
-                foreach (var jobVm in jobsToRun)
+                if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory))
                 {
-                    if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
-
-                    jobVm.Progress = 0;
-
-                    tasks.Add(Task.Run(() => _backupEngine.ExecuteJobAsync(jobVm.Model)));
+                    CurrentFile = UIStrings["MsgEmptyPath"];
+                    return;
                 }
 
-                await Task.WhenAll(tasks);
-                CurrentFile = "✅ All selected backups completed successfully!";
+                jobVm.IsRunning = true;
+                jobVm.IsPaused = false;
+                jobVm.Progress = 0;
+                CurrentFile = $"⏳ Starting backup: {jobVm.Name}...";
+
+                try
+                {
+                    await Task.Run(() => _backupEngine.ExecuteJobAsync(jobVm.Model));
+                    CurrentFile = $"✅ Backup {jobVm.Name} completed successfully!";
+                }
+                catch (Exception ex)
+                {
+                    CurrentFile = $"❌ Error on {jobVm.Name}: {ex.Message}";
+                }
+                finally
+                {
+                    jobVm.IsRunning = false;
+                    jobVm.IsPaused = false;
+                }
             }
-            catch (Exception ex)
+        }
+
+        private void TogglePauseJob(object parameter)
+        {
+            if (parameter is JobViewModel jobVm)
             {
-                CurrentFile = $"❌ Error: {ex.Message}";
+                jobVm.IsPaused = !jobVm.IsPaused;
+
+                if (jobVm.IsPaused)
+                {
+                    CurrentFile = $"⏸ Backup {jobVm.Name} paused.";
+                    _backupEngine.PauseJob(jobVm.Name);
+                }
+                else
+                {
+                    CurrentFile = $"▶ Resuming backup {jobVm.Name}...";
+                    _backupEngine.ResumeJob(jobVm.Name);
+                }
             }
         }
 

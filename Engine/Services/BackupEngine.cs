@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Concurrent; // Nécessaire pour ConcurrentDictionary
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading; // Nécessaire pour ManualResetEvent
 using System.Threading.Tasks;
 using EasySave.Models;
 using EasyLog;
@@ -18,10 +20,31 @@ namespace EasySave.Services
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
 
+        // NOUVEAU : Dictionnaire pour stocker les événements de pause pour chaque tâche
+        private readonly ConcurrentDictionary<string, ManualResetEvent> _jobPauseEvents = new ConcurrentDictionary<string, ManualResetEvent>();
+
         public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
         {
             _stateTracker = stateTracker;
             _configManager = configManager;
+        }
+
+        // NOUVEAU : Méthode pour mettre en pause
+        public void PauseJob(string jobName)
+        {
+            if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent))
+            {
+                pauseEvent.Reset(); // Ferme la barrière (met en pause)
+            }
+        }
+
+        // NOUVEAU : Méthode pour reprendre
+        public void ResumeJob(string jobName)
+        {
+            if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent))
+            {
+                pauseEvent.Set(); // Ouvre la barrière (relance)
+            }
         }
 
         private string GetRunningBusinessSoftware()
@@ -77,71 +100,91 @@ namespace EasySave.Services
                 });
             }
 
-            foreach (string file in allFiles)
+            // NOUVEAU : Initialise l'événement de pause pour cette tâche (en position "Ouverte" / true)
+            _jobPauseEvents[job.Name] = new ManualResetEvent(true);
+
+            try
             {
-                string currentBlockingSoftware = GetRunningBusinessSoftware();
-                if (currentBlockingSoftware != null)
+                foreach (string file in allFiles)
                 {
-                    throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{currentBlockingSoftware}'.");
-                }
+                    // NOUVEAU : C'est ici que la magie opère. 
+                    // Si l'utilisateur clique sur pause, le thread va se figer à cette ligne jusqu'à ce qu'il clique sur "Play".
+                    _jobPauseEvents[job.Name].WaitOne();
 
-                string relativePath = Path.GetRelativePath(job.SourceDirectory, file);
-                string targetFile = Path.Combine(job.TargetDirectory, relativePath);
-
-                string targetFileDir = Path.GetDirectoryName(targetFile);
-                if (!Directory.Exists(targetFileDir))
-                {
-                    Directory.CreateDirectory(targetFileDir);
-                }
-
-                bool shouldCopy = true;
-                FileInfo sourceFileInfo = new FileInfo(file);
-
-                if (job.Type == BackupType.Differential && File.Exists(targetFile))
-                {
-                    if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
+                    string currentBlockingSoftware = GetRunningBusinessSoftware();
+                    if (currentBlockingSoftware != null)
                     {
-                        shouldCopy = false;
-                        int currentProgress = 0;
+                        throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{currentBlockingSoftware}'.");
+                    }
 
-                        lock (_stateLock)
+                    string relativePath = Path.GetRelativePath(job.SourceDirectory, file);
+                    string targetFile = Path.Combine(job.TargetDirectory, relativePath);
+
+                    string targetFileDir = Path.GetDirectoryName(targetFile);
+                    if (!Directory.Exists(targetFileDir))
+                    {
+                        Directory.CreateDirectory(targetFileDir);
+                    }
+
+                    bool shouldCopy = true;
+                    FileInfo sourceFileInfo = new FileInfo(file);
+
+                    if (job.Type == BackupType.Differential && File.Exists(targetFile))
+                    {
+                        if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
                         {
-                            _stateTracker.UpdateState(job.Name, s =>
+                            shouldCopy = false;
+                            int currentProgress = 0;
+
+                            lock (_stateLock)
                             {
-                                s.NbFilesLeftToDo--;
-                                s.RemainingFilesSize -= sourceFileInfo.Length;
-                                s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
-                                currentProgress = s.Progression;
-                            });
+                                _stateTracker.UpdateState(job.Name, s =>
+                                {
+                                    s.NbFilesLeftToDo--;
+                                    s.RemainingFilesSize -= sourceFileInfo.Length;
+                                    s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
+                                    currentProgress = s.Progression;
+                                });
+                            }
+                            OnJobProgress?.Invoke(job.Name, currentProgress);
                         }
-                        OnJobProgress?.Invoke(job.Name, currentProgress);
+                    }
+
+                    if (shouldCopy)
+                    {
+                        await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
                     }
                 }
 
-                if (shouldCopy)
+                lock (_stateLock)
                 {
-                    await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
+                    _stateTracker.UpdateState(job.Name, s =>
+                    {
+                        s.State = "END";
+                        s.SourceFilePath = "";
+                        s.TargetFilePath = "";
+                        s.TotalFilesToCopy = 0;
+                        s.TotalFilesSize = 0;
+                        s.NbFilesLeftToDo = 0;
+                        s.Progression = 0;
+                    });
+                }
+                OnJobProgress?.Invoke(job.Name, 100);
+            }
+            finally
+            {
+                // NOUVEAU : Nettoyage de l'événement de pause pour libérer la mémoire à la fin de la sauvegarde
+                if (_jobPauseEvents.TryRemove(job.Name, out var pauseEvent))
+                {
+                    pauseEvent.Dispose();
                 }
             }
-
-            lock (_stateLock)
-            {
-                _stateTracker.UpdateState(job.Name, s =>
-                {
-                    s.State = "END";
-                    s.SourceFilePath = "";
-                    s.TargetFilePath = "";
-                    s.TotalFilesToCopy = 0;
-                    s.TotalFilesSize = 0;
-                    s.NbFilesLeftToDo = 0;
-                    s.Progression = 0;
-                });
-            }
-            OnJobProgress?.Invoke(job.Name, 100);
         }
 
         private async Task CopyFileWithLoggingAsync(string source, string target, string jobName, long fileSize)
         {
+            // [Le reste de ta méthode CopyFileWithLoggingAsync ne change pas !]
+            // ... (Conserve le contenu de ta méthode CopyFileWithLoggingAsync intact ici)
             lock (_stateLock)
             {
                 _stateTracker.UpdateState(jobName, s =>

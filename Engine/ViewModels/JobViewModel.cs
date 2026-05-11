@@ -66,18 +66,27 @@ namespace EasySave.ViewModels
         protected void OnPropertyChanged(string propertyName) =>
           PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-        private bool _isSelected;
-        public bool IsSelected
-        {
-            get => _isSelected;
-            set { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); }
-        }
+        // On supprime IsSelected qui n'est plus utile
 
         private int _progress;
         public int Progress
         {
             get => _progress;
             set { _progress = value; OnPropertyChanged(nameof(Progress)); }
+        }
+
+        private bool _isRunning;
+        public bool IsRunning
+        {
+            get => _isRunning;
+            set { _isRunning = value; OnPropertyChanged(nameof(IsRunning)); }
+        }
+
+        private bool _isPaused;
+        public bool IsPaused
+        {
+            get => _isPaused;
+            set { _isPaused = value; OnPropertyChanged(nameof(IsPaused)); }
         }
     }
 }
