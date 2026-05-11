@@ -11,23 +11,8 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- EN-TETE ET BOUTONS DE LANGUE -->
-        <Grid Grid.Row="0" Margin="0,0,0,20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <TextBlock Grid.Row="0" Text="{Binding UIStrings[Title]}" FontSize="28" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20" VerticalAlignment="Center"/>
 
-            <TextBlock Grid.Column="0" Text="{Binding UIStrings[Title]}" FontSize="28" FontWeight="Bold" Foreground="#2C3E50" VerticalAlignment="Center"/>
-
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Content="{Binding UIStrings[Settings]}" Command="{Binding ToggleSettingsCommand}" Padding="15,5" Margin="0,0,15,0" Background="#95A5A6" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                <Button Content="EN" Command="{Binding ChangeLanguageCommand}" CommandParameter="EN" Width="35" Height="35" Margin="0,0,10,0" Background="White" BorderBrush="#BDC3C7" Cursor="Hand"/>
-                <Button Content="FR" Command="{Binding ChangeLanguageCommand}" CommandParameter="FR" Width="35" Height="35" Background="White" BorderBrush="#BDC3C7" Cursor="Hand"/>
-            </StackPanel>
-        </Grid>
-
-        <!-- DATAGRID -->
         <DataGrid Grid.Row="1" ItemsSource="{Binding Jobs}"
                   SelectedItem="{Binding SelectedJob}"
                   AutoGenerateColumns="False"
@@ -84,7 +69,6 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- ZONE D'ÉDITION ET D'ACTION -->
         <Grid Grid.Row="2" Margin="0,20,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
