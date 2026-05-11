@@ -180,7 +180,7 @@ namespace EasySave.ViewModels
         public ICommand ChangeLanguageCommand { get; }
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
-        public ICommand RefreshProcessesCommand { get; } // Réintégré pour le clic sur l'onglet
+        public ICommand RefreshProcessesCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
         {
@@ -232,7 +232,7 @@ namespace EasySave.ViewModels
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
             AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
-            RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses); // Initialisation
+            RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
 
             ChangeLanguage(CurrentSettings.Language);
 
@@ -246,7 +246,6 @@ namespace EasySave.ViewModels
             {
                 while (true)
                 {
-                    // Demande les états distants toutes les 2 secondes si on est connecté
                     if (_currentConnectionStatus == ConnectionStatus.Connected)
                     {
                         _networkService.SendMessage("[GET_STATES]");
@@ -258,7 +257,6 @@ namespace EasySave.ViewModels
 
         private void ExecuteRefreshProcesses(object parameter)
         {
-            // Déclenché instantanément quand on clique sur l'onglet Processus
             if (_currentConnectionStatus == ConnectionStatus.Connected)
             {
                 _networkService.SendMessage("[GET_STATES]");
@@ -270,7 +268,6 @@ namespace EasySave.ViewModels
             _currentConnectionStatus = status;
             UpdateConnectionStatusUI();
 
-            // DÈS QU'ON EST CONNECTÉ : On force l'envoi de notre état au serveur
             if (status == ConnectionStatus.Connected)
             {
                 _stateTracker.BroadcastState();
@@ -405,7 +402,17 @@ namespace EasySave.ViewModels
             {
                 CurrentFile = "Démarrage...";
                 _networkService.SendMessage($"[START] {SelectedJob.Name}");
+
                 await _backupEngine.ExecuteJobAsync(SelectedJob.Model);
+
+                // FORCER LA FIN DU PROCESSUS DANS LE STATETRACKER ET L'ENVOYER AU SERVEUR
+                _stateTracker.UpdateState(SelectedJob.Name, state =>
+                {
+                    state.State = "END";
+                    state.Progression = 0;
+                    state.NbFilesLeftToDo = 0;
+                });
+
                 CurrentFile = "Succès !";
                 _networkService.SendMessage($"[END] {SelectedJob.Name} - Succes");
             }
@@ -427,7 +434,17 @@ namespace EasySave.ViewModels
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
                     _networkService.SendMessage($"[START] {jobVm.Name}");
+
                     await _backupEngine.ExecuteJobAsync(jobVm.Model);
+
+                    // FORCER LA FIN DU PROCESSUS DANS LE STATETRACKER ET L'ENVOYER AU SERVEUR
+                    _stateTracker.UpdateState(jobVm.Name, state =>
+                    {
+                        state.State = "END";
+                        state.Progression = 0;
+                        state.NbFilesLeftToDo = 0;
+                    });
+
                     _networkService.SendMessage($"[END] {jobVm.Name} - Succes");
                 }
                 CurrentFile = "Terminé avec succès !";

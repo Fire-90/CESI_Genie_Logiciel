@@ -44,33 +44,31 @@
                                 <TextBlock Text="{Binding ClientId}" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
 
                                 <ItemsControl ItemsSource="{Binding Jobs}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#F8F9FA" CornerRadius="8" Padding="15" Margin="0,0,0,10" BorderBrush="#E0E0E0" BorderThickness="1">
-                                                <Grid>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                    </Grid.RowDefinitions>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
+                                            <Border Background="#F8F9FA" CornerRadius="8" Padding="15" Margin="0,0,15,15" BorderBrush="#E0E0E0" BorderThickness="1" Width="140">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="15" Foreground="#34495E" HorizontalAlignment="Center" Margin="0,0,0,5"/>
 
-                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" FontWeight="Bold" FontSize="15" Foreground="#34495E"/>
-                                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding State}" Foreground="#7F8C8D" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding State}" Foreground="#7F8C8D" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10"/>
 
-                                                    <ProgressBar Grid.Row="1" Grid.Column="0" Value="{Binding Progression}" Maximum="100" Height="8" Margin="0,12,20,0" Foreground="#2ECC71" Background="#E0E0E0" BorderThickness="0"/>
+                                                    <ProgressBar Value="{Binding Progression}" Maximum="100" Height="6" Margin="0,0,0,8" Foreground="#3498DB" Background="#E0E0E0" BorderThickness="0"/>
 
-                                                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" Foreground="#7F8C8D" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                                        <Run Text="{Binding Progression, StringFormat={}{0:F0}%}" FontWeight="Bold" Foreground="#3498DB"/>
-                                                        <Run Text=" ("/>
-                                                        <Run Text="{Binding NbFilesLeftToDo}"/>
-                                                        <Run Text=" / "/>
-                                                        <Run Text="{Binding TotalFilesToCopy}"/>
-                                                        <Run Text=")"/>
+                                                    <TextBlock Foreground="#2C3E50" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5">
+                                                        <Run Text="{Binding Progression, StringFormat={}{0:F0}%}"/>
                                                     </TextBlock>
-                                                </Grid>
+
+                                                    <TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center">
+                                                        <Run Text="{Binding NbFilesLeftToDo}"/>
+                                                        <Run Text=" restants"/>
+                                                    </TextBlock>
+                                                </StackPanel>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
