@@ -39,7 +39,7 @@ namespace EasyLog
         private readonly string _settingsFilePath;
         private static readonly object _lockObj = new object();
 
-        // Événement déclenché à chaque nouveau log généré (JobId, Format, Entry)
+        // Événement déclenché pour envoi au serveur
         public static event Action<string, string, LogEntry> OnLogGenerated;
 
         private DailyLogger()
@@ -49,7 +49,7 @@ namespace EasyLog
             _settingsFilePath = Path.Combine(exePath, "Data", "settings.json");
         }
 
-        // Récupère à la fois le format et la destination des logs
+        // Récupère Format et Destination
         private (string format, string destination) GetLogSettings()
         {
             string format = "json";
@@ -62,13 +62,9 @@ namespace EasyLog
                     using (JsonDocument doc = JsonDocument.Parse(json))
                     {
                         if (doc.RootElement.TryGetProperty("LogFormat", out JsonElement formatElement))
-                        {
                             format = formatElement.GetString() ?? "json";
-                        }
                         if (doc.RootElement.TryGetProperty("LogDestination", out JsonElement destElement))
-                        {
                             destination = destElement.GetString() ?? "LocalAndServer";
-                        }
                     }
                 }
             }
@@ -84,29 +80,23 @@ namespace EasyLog
 
             string logDirectory = Path.Combine(_baseDataDirectory, "logs");
 
-            // --- SAUVEGARDE LOCALE ---
+            // Sauvegarde en Local
             if (destination.Equals("LocalOnly", StringComparison.OrdinalIgnoreCase) ||
                 destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
             {
                 lock (_lockObj)
                 {
                     if (!Directory.Exists(logDirectory))
-                    {
                         Directory.CreateDirectory(logDirectory);
-                    }
 
                     if (currentFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
-                    {
                         WriteXmlLog(entry, logDirectory);
-                    }
                     else
-                    {
                         WriteJsonLog(entry, logDirectory);
-                    }
                 }
             }
 
-            // --- ENVOI AU SERVEUR (Via Événement) ---
+            // Envoi au Serveur via l'événement
             if (destination.Equals("ServerOnly", StringComparison.OrdinalIgnoreCase) ||
                 destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
             {

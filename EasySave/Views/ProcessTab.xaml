@@ -3,56 +3,53 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             mc:Ignorable="d">
+             mc:Ignorable="d" Background="Transparent">
 
-    <Grid Margin="15">
+    <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="1*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="2*"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <GroupBox Header="Processus Locaux" Grid.Row="0" Margin="0,0,0,10" Padding="10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="150"/>
-                </Grid.ColumnDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="Suivi des autres utilisateurs (Serveur)" FontSize="22" FontWeight="Bold" Foreground="#2C3E50" VerticalAlignment="Center"/>
+            <Button Content="Actualiser les etats" Command="{Binding RefreshProcessesCommand}" Padding="15,8" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right"/>
+        </Grid>
 
-                <ListBox Grid.Column="0" ItemsSource="{Binding Processes}" SelectedItem="{Binding SelectedProcess}" Margin="0,0,10,0">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock>
-                                <Run Text="[" Foreground="Gray"/>
-                                <Run Text="{Binding Id}" FontWeight="Bold"/>
-                                <Run Text="] " Foreground="Gray"/>
-                                <Run Text="{Binding Name}"/>
-                            </TextBlock>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+        <Border Grid.Row="1" Background="White" CornerRadius="10" Padding="15">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
+            </Border.Effect>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                    <Button Content="Actualiser" Command="{Binding RefreshProcessesCommand}" Padding="10,5" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Margin="0,0,0,10"/>
-                    <Button Content="Arreter" Command="{Binding StopProcessCommand}" Padding="10,5" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                </StackPanel>
-            </Grid>
-        </GroupBox>
-
-        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#BDC3C7" Margin="0,5"/>
-
-        <GroupBox Header="Suivi des autres utilisateurs (Remote States)" Grid.Row="2" Margin="0,10,0,0" Padding="10">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding RemoteStates}">
+
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Style.Triggers>
+                                <Trigger Property="HasItems" Value="False">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate>
+                                                <TextBlock Text="Aucun autre utilisateur connecte ou aucun etat disponible." 
+                                                           Foreground="#7F8C8D" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,20,0,0"/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Expander Header="{Binding ClientId}" IsExpanded="True" Margin="0,0,0,15" Background="#F8F9FA">
-                                <DataGrid ItemsSource="{Binding Jobs}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10" HeadersVisibility="Column" Background="White" RowBackground="White" AlternatingRowBackground="#F2F2F2">
+                            <Expander Header="{Binding ClientId}" IsExpanded="True" Margin="0,0,0,15" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="1">
+                                <DataGrid ItemsSource="{Binding Jobs}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10" HeadersVisibility="Column" Background="White" RowBackground="White" AlternatingRowBackground="#F2F2F2" BorderBrush="#E0E0E0">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Travail" Binding="{Binding Name}" Width="100"/>
-                                        <DataGridTextColumn Header="Etat" Binding="{Binding State}" Width="80"/>
-                                        <DataGridTextColumn Header="Progression" Binding="{Binding Progression, StringFormat={}{0:F0}%}" Width="100"/>
-                                        <DataGridTextColumn Header="Fichiers (Restants/Total)" Width="150">
+                                        <DataGridTextColumn Header="Travail" Binding="{Binding Name}" Width="*"/>
+                                        <DataGridTextColumn Header="Etat" Binding="{Binding State}" Width="*"/>
+                                        <DataGridTextColumn Header="Progression" Binding="{Binding Progression, StringFormat={}{0:F0}%}" Width="*"/>
+                                        <DataGridTextColumn Header="Fichiers (Restants/Total)" Width="1.5*">
                                             <DataGridTextColumn.Binding>
                                                 <MultiBinding StringFormat="{}{0} / {1}">
                                                     <Binding Path="NbFilesLeftToDo" />
@@ -60,7 +57,7 @@
                                                 </MultiBinding>
                                             </DataGridTextColumn.Binding>
                                         </DataGridTextColumn>
-                                        <DataGridTextColumn Header="Derniere Action" Binding="{Binding LastActionDate}" Width="150"/>
+                                        <DataGridTextColumn Header="Derniere Action" Binding="{Binding LastActionDate}" Width="1.5*"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </Expander>
@@ -68,6 +65,6 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
-        </GroupBox>
+        </Border>
     </Grid>
 </UserControl>

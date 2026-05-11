@@ -38,6 +38,9 @@ namespace EasySave.Services
         private static readonly object _lockObj = new object();
         private List<JobStateInfo> _currentStates;
 
+        // Événement déclenché à chaque mise à jour du fichier state.json
+        public static event Action<string> OnStateUpdated;
+
         public StateTracker(List<BackupJob> configuredJobs)
         {
             string dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
@@ -101,6 +104,9 @@ namespace EasySave.Services
             var options = new JsonSerializerOptions { WriteIndented = true };
             string jsonString = JsonSerializer.Serialize(_currentStates, options);
             File.WriteAllText(_stateFilePath, jsonString);
+
+            // On avertit le système qu'un nouveau state est disponible pour l'envoi
+            OnStateUpdated?.Invoke(jsonString);
         }
     }
 }

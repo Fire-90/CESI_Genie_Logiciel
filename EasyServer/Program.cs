@@ -103,7 +103,7 @@ namespace EasyServer
                             }
                             else if (msg.StartsWith("[GET_STATES]"))
                             {
-                                string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync();
+                                string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync(clientId);
                                 byte[] responseData = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
                                 try { await stream.WriteAsync(responseData, 0, responseData.Length); } catch { }
                             }

@@ -231,6 +231,11 @@ namespace EasySave.ViewModels
                 catch { }
             };
 
+            EasySave.Services.StateTracker.OnStateUpdated += (jsonState) =>
+            {
+                _networkService.SendMessage($"[STATE]|{jsonState}");
+            };
+
             _networkService.OnMessageReceived += HandleNetworkMessage;
 
             AddJobCommand = new RelayCommand(ExecuteAddJob);
