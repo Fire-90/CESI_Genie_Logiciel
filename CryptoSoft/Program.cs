@@ -27,7 +27,9 @@ namespace CryptoSoft
                 string sourceFile = args[0];
                 string targetFile = args[1];
 
-                string key = "EasySaveKey";
+                // Récupère la clé depuis le 3ème argument ou utilise une valeur par défaut
+                string key = args.Length >= 3 ? args[2] : "EasySaveKey";
+                if (string.IsNullOrWhiteSpace(key)) key = "EasySaveKey";
 
                 try
                 {

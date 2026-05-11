@@ -35,7 +35,10 @@
 							<ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat, Mode=TwoWay}" Height="35" Margin="0,0,0,20" Padding="5"/>
 
 							<TextBlock Text="{Binding LanguageService[LblLogDestination]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-							<ComboBox ItemsSource="{Binding AvailableLogDestinations}" SelectedItem="{Binding SelectedLogDestination, Mode=TwoWay}" Height="35" Padding="5"/>
+							<ComboBox ItemsSource="{Binding AvailableLogDestinations}" SelectedItem="{Binding SelectedLogDestination, Mode=TwoWay}" Height="35" Padding="5" Margin="0,0,0,20"/>
+
+							<TextBlock Text="{Binding LanguageService[LblMaxParallelSize]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+							<TextBox Text="{Binding MaxParallelFileSizeLimitKb, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
 						</StackPanel>
 					</Border>
 
@@ -74,7 +77,10 @@
 
 							<TextBlock Text="{Binding LanguageService[LblPriorityExt]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
 							<TextBox Text="{Binding PriorityExtensionsString, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
-							<TextBlock Text="{Binding LanguageService[LblExtensionsHelp]}" FontSize="10" Foreground="#BDC3C7" Margin="0,5,0,0"/>
+							<TextBlock Text="{Binding LanguageService[LblExtensionsHelp]}" FontSize="10" Foreground="#BDC3C7" Margin="0,5,0,15"/>
+
+							<TextBlock Text="{Binding LanguageService[LblEncryptionKey]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+							<TextBox Text="{Binding EncryptionKey, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
 						</StackPanel>
 					</Border>
 

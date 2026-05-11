@@ -54,7 +54,9 @@ namespace EasySave.Services
                 { "Softwares", "Business Softwares:" },
                 { "LblLogFormat", "Log Format:" },
                 { "LblLogDestination", "Log Destination:" },
+                { "LblMaxParallelSize", "Max Parallel File Size (KB):" },
                 { "LblEncryptedExt", "Encryption Extensions:" },
+                { "LblEncryptionKey", "Encryption Key:" },
                 { "LblPriorityExt", "Priority Extensions:" },
                 { "LblServerIP", "Server IP:" },
                 { "Recent", "Recent Activity:" },
@@ -63,8 +65,7 @@ namespace EasySave.Services
                 { "MsgEmptyPath", "❌ Error: Source or Target directory is empty." },
                 { "MsgSlotAdded", "✅ New empty job added." },
                 { "MsgDeleted", "🗑️ Job deleted successfully." },
-                
-                // Status States
+
                 { "StateInactive", "INACTIVE" },
                 { "StateActive", "ACTIVE" },
                 { "StateSuspended", "SUSPENDED" },
@@ -72,14 +73,12 @@ namespace EasySave.Services
                 { "StateStopped", "JUST STOPPED" },
                 { "StateFinished", "FINISHED" },
 
-                // Centralized messages
                 { "MsgStartGlobal", "⏳ Starting background backups..." },
                 { "MsgSuccessGlobal", "✅ All selected backups completed successfully!" },
                 { "MsgError", "❌ Error:" },
                 { "MsgBlockingSoftware", "❌ Backup paused/interrupted. Blocking software running:" },
                 { "MsgJobStopped", "Job stopped." },
 
-                // Settings & Network
                 { "TitleGeneral", "⚙ General Settings" },
                 { "LblLanguage", "Language" },
                 { "TitleNetwork", "🌐 Network" },
@@ -114,7 +113,9 @@ namespace EasySave.Services
                 { "Softwares", "Logiciels métiers :" },
                 { "LblLogFormat", "Format des logs :" },
                 { "LblLogDestination", "Destination des logs :" },
+                { "LblMaxParallelSize", "Taille max transfert parallèle (Ko) :" },
                 { "LblEncryptedExt", "Extensions à chiffrer :" },
+                { "LblEncryptionKey", "Clé de chiffrement :" },
                 { "LblPriorityExt", "Extensions prioritaires :" },
                 { "LblServerIP", "IP du serveur :" },
                 { "Recent", "Activité récente :" },
@@ -124,7 +125,6 @@ namespace EasySave.Services
                 { "MsgSlotAdded", "✅ Nouveau travail vide ajouté." },
                 { "MsgDeleted", "🗑️ Travail supprimé avec succès." },
 
-                // États des Statuts
                 { "StateInactive", "INACTIF" },
                 { "StateActive", "ACTIF" },
                 { "StateSuspended", "SUSPENDU" },
@@ -132,14 +132,12 @@ namespace EasySave.Services
                 { "StateStopped", "ARRÊTÉ" },
                 { "StateFinished", "TERMINÉ" },
 
-                // Messages centralisés
                 { "MsgStartGlobal", "⏳ Démarrage des sauvegardes en arrière-plan..." },
                 { "MsgSuccessGlobal", "✅ Toutes les sauvegardes sélectionnées sont terminées !" },
                 { "MsgError", "❌ Erreur :" },
                 { "MsgBlockingSoftware", "❌ Sauvegarde interrompue ! Logiciel métier détecté :" },
                 { "MsgJobStopped", "Sauvegarde interrompue." },
 
-                // Settings & Network
                 { "TitleGeneral", "⚙ Paramètres Généraux" },
                 { "LblLanguage", "Langue / Language" },
                 { "TitleNetwork", "🌐 Réseau" },

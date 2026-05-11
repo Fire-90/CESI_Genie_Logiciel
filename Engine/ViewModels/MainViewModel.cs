@@ -122,6 +122,35 @@ namespace EasySave.ViewModels
             }
         }
 
+        // NOUVEAUX CHAMPS
+        public long MaxParallelFileSizeLimitKb
+        {
+            get => CurrentSettings?.MaxParallelFileSizeLimitKb ?? 50000;
+            set
+            {
+                if (CurrentSettings != null && CurrentSettings.MaxParallelFileSizeLimitKb != value)
+                {
+                    CurrentSettings.MaxParallelFileSizeLimitKb = value;
+                    OnPropertyChanged(nameof(MaxParallelFileSizeLimitKb));
+                    SaveConfig();
+                }
+            }
+        }
+
+        public string EncryptionKey
+        {
+            get => CurrentSettings?.EncryptionKey ?? "EasySaveKey";
+            set
+            {
+                if (CurrentSettings != null && CurrentSettings.EncryptionKey != value)
+                {
+                    CurrentSettings.EncryptionKey = value;
+                    OnPropertyChanged(nameof(EncryptionKey));
+                    SaveConfig();
+                }
+            }
+        }
+
         public string EncryptedExtensionsString
         {
             get => CurrentSettings?.EncryptedExtensions == null ? "" : string.Join(";", CurrentSettings.EncryptedExtensions);
@@ -201,8 +230,6 @@ namespace EasySave.ViewModels
         public ICommand RemoveSoftwareCommand { get; }
         public ICommand RefreshProcessesCommand { get; }
         public ICommand ToggleSettingsCommand { get; }
-
-        // Commandes de contrôle d'exécution
         public ICommand PauseJobCommand { get; }
         public ICommand ResumeJobCommand { get; }
         public ICommand StopJobCommand { get; }
@@ -240,7 +267,6 @@ namespace EasySave.ViewModels
                 _networkService.SendMessage($"[PROGRESS] {file}");
             };
 
-            // Événement d'attente sur le Mutex
             _backupEngine.OnJobWaiting += (jobName, isWaiting) =>
             {
                 Action updateWait = () =>
@@ -253,7 +279,6 @@ namespace EasySave.ViewModels
                 else updateWait();
             };
 
-            // Événement Progression Globale par Job
             _backupEngine.OnJobProgress += (jobName, progress) =>
             {
                 Action updateProgress = () =>
@@ -264,7 +289,6 @@ namespace EasySave.ViewModels
                         jobVm.Progress = progress;
                         if (progress >= 100)
                         {
-                            // Délai pour laisser l'utilisateur voir les 100% avant réinitialisation
                             Task.Run(async () =>
                             {
                                 await Task.Delay(1500);
@@ -279,7 +303,6 @@ namespace EasySave.ViewModels
                 else updateProgress();
             };
 
-            // Événements Logs & State
             EasyLog.DailyLogger.OnLogGenerated += (jobId, format, entry) =>
             {
                 try
@@ -486,7 +509,6 @@ namespace EasySave.ViewModels
 
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            // Ignorer la sauvegarde pour toutes les propriétés liées à l'exécution UI
             if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" ||
                 e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsWaiting") return;
 

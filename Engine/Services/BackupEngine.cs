@@ -16,7 +16,7 @@ namespace EasySave.Services
         public delegate void ProgressUpdateHandler(string currentFile, int remainingFiles);
         public event ProgressUpdateHandler OnProgressUpdate;
         public event Action<string, int> OnJobProgress;
-        public event Action<string, bool> OnJobWaiting; // <-- Nouvel événement pour l'attente
+        public event Action<string, bool> OnJobWaiting;
 
         private readonly StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
@@ -25,8 +25,11 @@ namespace EasySave.Services
         // Global counter for priority files across all threads (Barrier concept)
         private static int GlobalPriorityFilesCount = 0;
 
-        // Verrou statique limitant l'exécution de CryptoSoft à 1 seul thread à la fois globalement
+        // Verrou CryptoSoft global (Mono-Instance)
         private static readonly SemaphoreSlim _cryptoSoftLock = new SemaphoreSlim(1, 1);
+
+        // Verrou global pour limiter le transfert simultané de fichiers lourds à UN SEUL fichier à la fois
+        private static readonly SemaphoreSlim _largeFileLock = new SemaphoreSlim(1, 1);
 
         // Thread control for Pause and Stop
         private readonly ConcurrentDictionary<string, ManualResetEvent> _jobPauseEvents = new();
@@ -80,7 +83,6 @@ namespace EasySave.Services
 
             if (!Directory.Exists(job.SourceDirectory)) throw new DirectoryNotFoundException("Source directory not found.");
 
-            // Initialize Thread Controls for this specific job
             var cts = new CancellationTokenSource();
             var pauseEvent = new ManualResetEvent(true);
             _jobCancellationTokens[job.Name] = cts;
@@ -123,8 +125,8 @@ namespace EasySave.Services
                 // Step 1: Priority files
                 foreach (string file in priorityFiles)
                 {
-                    pauseEvent.WaitOne(); // Wait here if job is paused
-                    cts.Token.ThrowIfCancellationRequested(); // Stop here if job is cancelled
+                    pauseEvent.WaitOne();
+                    cts.Token.ThrowIfCancellationRequested();
 
                     await ProcessSingleFileAsync(file, job);
                     Interlocked.Decrement(ref GlobalPriorityFilesCount);
@@ -133,10 +135,9 @@ namespace EasySave.Services
                 // Step 2: Normal files (Barrier)
                 foreach (string file in normalFiles)
                 {
-                    // Global Barrier: Wait for all priority files across ALL threads
                     while (Interlocked.CompareExchange(ref GlobalPriorityFilesCount, 0, 0) > 0)
                     {
-                        cts.Token.ThrowIfCancellationRequested(); // Allow cancellation even while waiting at the barrier
+                        cts.Token.ThrowIfCancellationRequested();
                         await Task.Delay(200);
                     }
 
@@ -148,12 +149,10 @@ namespace EasySave.Services
             }
             catch (OperationCanceledException)
             {
-                // Job was manually stopped by user
                 throw new Exception("Job stopped manually.");
             }
             finally
             {
-                // Clean up memory and reset state
                 _jobCancellationTokens.TryRemove(job.Name, out _);
                 _jobPauseEvents.TryRemove(job.Name, out _);
 
@@ -233,36 +232,57 @@ namespace EasySave.Services
             bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>())
                                  .Contains(Path.GetExtension(source).ToLower());
 
+            // Convertir la taille max paramétrée (Ko) en octets
+            long limitInBytes = settings.MaxParallelFileSizeLimitKb * 1024L;
+            bool isLargeFile = fileSize > limitInBytes;
+
             try
             {
-                stopwatch.Start();
-
-                if (shouldEncrypt) ExecuteCryptoSoft(source, target, job);
-                else File.Copy(source, target, true);
-
-                stopwatch.Stop();
-                timeMs = stopwatch.ElapsedMilliseconds;
-
-                int currentProgress = 0;
-                lock (_stateLock)
+                // Si le fichier est lourd, il doit attendre que le verrou de gros fichiers soit libre
+                if (isLargeFile)
                 {
-                    _stateTracker.UpdateState(job.Name, s =>
-                    {
-                        s.NbFilesLeftToDo--;
-                        s.RemainingFilesSize -= fileSize;
-                        s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
-                        currentProgress = s.Progression;
-                    });
+                    await _largeFileLock.WaitAsync();
                 }
 
-                OnJobProgress?.Invoke(job.Name, currentProgress);
-                OnProgressUpdate?.Invoke(source, 0);
+                try
+                {
+                    stopwatch.Start();
+
+                    // On envoie la clé choisie par l'utilisateur à CryptoSoft
+                    if (shouldEncrypt) ExecuteCryptoSoft(source, target, job, settings.EncryptionKey);
+                    else File.Copy(source, target, true);
+
+                    stopwatch.Stop();
+                    timeMs = stopwatch.ElapsedMilliseconds;
+
+                    int currentProgress = 0;
+                    lock (_stateLock)
+                    {
+                        _stateTracker.UpdateState(job.Name, s =>
+                        {
+                            s.NbFilesLeftToDo--;
+                            s.RemainingFilesSize -= fileSize;
+                            s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
+                            currentProgress = s.Progression;
+                        });
+                    }
+
+                    OnJobProgress?.Invoke(job.Name, currentProgress);
+                    OnProgressUpdate?.Invoke(source, 0);
+                }
+                catch (Exception)
+                {
+                    stopwatch.Stop();
+                    timeMs = -1;
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                stopwatch.Stop();
-                timeMs = -1;
-                // Vous pouvez logguer l'exception 'ex' ici si nécessaire
+                // Libérer le verrou pour permettre au prochain fichier lourd d'être copié
+                if (isLargeFile)
+                {
+                    _largeFileLock.Release();
+                }
             }
 
             await DailyLogger.Instance.WriteLogAsync(new LogEntry
@@ -275,14 +295,13 @@ namespace EasySave.Services
             }, job.Id.ToString(), settings.LogFormat);
         }
 
-        private void ExecuteCryptoSoft(string source, string target, BackupJob job)
+        private void ExecuteCryptoSoft(string source, string target, BackupJob job, string encryptionKey)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
             if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe missing.");
 
             bool isWaitingFired = false;
 
-            // Si un autre travail utilise déjà CryptoSoft, on signale qu'on passe en file d'attente
             if (_cryptoSoftLock.CurrentCount == 0)
             {
                 isWaitingFired = true;
@@ -293,12 +312,10 @@ namespace EasySave.Services
                 }
             }
 
-            // Mise en file d'attente (verrou global) pour garantir le Mono-instance
             _cryptoSoftLock.Wait();
 
             try
             {
-                // On s'assure de réinitialiser l'état à ACTIVE une fois le verrou obtenu
                 if (isWaitingFired)
                 {
                     OnJobWaiting?.Invoke(job.Name, false);
@@ -308,7 +325,11 @@ namespace EasySave.Services
                     }
                 }
 
-                ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\"")
+                // Récupération de la clé paramétrée, par défaut "EasySaveKey" si c'est vide
+                string safeKey = string.IsNullOrWhiteSpace(encryptionKey) ? "EasySaveKey" : encryptionKey;
+
+                // Lancement de CryptoSoft en lui passant la clé en 3ème argument
+                ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\" \"{safeKey}\"")
                 {
                     CreateNoWindow = true,
                     UseShellExecute = false
@@ -316,14 +337,12 @@ namespace EasySave.Services
 
                 using Process p = Process.Start(psi);
 
-                // On attend la fin avec un Timeout de 60 secondes maximum
                 if (!p.WaitForExit(60000))
                 {
                     p.Kill();
                     throw new TimeoutException("Timeout: CryptoSoft s'est bloqué et a dû être forcé à s'arrêter.");
                 }
 
-                // Vérification du code de retour du Mutex (-2) ou autre erreur (-1)
                 if (p.ExitCode != 0)
                 {
                     throw new InvalidOperationException($"CryptoSoft a échoué avec le code d'erreur : {p.ExitCode}");
@@ -331,7 +350,6 @@ namespace EasySave.Services
             }
             finally
             {
-                // Libération du verrou pour le prochain fichier dans la file
                 _cryptoSoftLock.Release();
             }
         }
