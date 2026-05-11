@@ -20,7 +20,7 @@ namespace EasySave.Services
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
 
-        // GLOBAL COUNTER: Shared across ALL running BackupEngine instances (The "Barrier" concept)
+        // Global counter for priority files across all threads (Barrier concept)
         private static int GlobalPriorityFilesCount = 0;
 
         public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
@@ -47,35 +47,29 @@ namespace EasySave.Services
         public async Task ExecuteJobAsync(BackupJob job)
         {
             string blocking = GetRunningBusinessSoftware();
-            if (blocking != null) throw new Exception($"Logiciel bloquant détecté : {blocking}");
 
-            if (!Directory.Exists(job.SourceDirectory)) throw new DirectoryNotFoundException("Source introuvable.");
+            // Throw a specifically formatted exception for the ViewModel to translate
+            if (blocking != null) throw new InvalidOperationException($"BLOCKING|{blocking}");
+
+            if (!Directory.Exists(job.SourceDirectory)) throw new DirectoryNotFoundException("Source directory not found.");
 
             string[] allFiles = Directory.GetFiles(job.SourceDirectory, "*.*", SearchOption.AllDirectories);
             var settings = _configManager.LoadSettings();
             List<string> priorityExtensions = settings.PriorityExtensions ?? new List<string>();
 
-            // 2. Sort files into Priority and Normal lists
             var priorityFiles = new List<string>();
             var normalFiles = new List<string>();
 
             foreach (string file in allFiles)
             {
                 string extension = Path.GetExtension(file).ToLower();
-                if (priorityExtensions.Contains(extension))
-                {
-                    priorityFiles.Add(file);
-                }
-                else
-                {
-                    normalFiles.Add(file);
-                }
+                if (priorityExtensions.Contains(extension)) priorityFiles.Add(file);
+                else normalFiles.Add(file);
             }
 
             int totalFilesToCopy = priorityFiles.Count + normalFiles.Count;
             long totalFilesSize = allFiles.Sum(f => new FileInfo(f).Length);
 
-            // 3. Register priority files in the global barrier counter safely
             Interlocked.Add(ref GlobalPriorityFilesCount, priorityFiles.Count);
 
             lock (_stateLock)
@@ -93,22 +87,18 @@ namespace EasySave.Services
 
             try
             {
-                // 4. STEP ONE: Process PRIORITY files first
+                // Step 1: Priority files
                 foreach (string file in priorityFiles)
                 {
                     await ProcessSingleFileAsync(file, job);
-
-                    // Decrease global priority counter safely when a priority file is done
                     Interlocked.Decrement(ref GlobalPriorityFilesCount);
                 }
 
-                // 5. STEP TWO: Process NORMAL files (The Barrier)
+                // Step 2: Normal files (Barrier)
                 foreach (string file in normalFiles)
                 {
-                    // Barrier: Wait until ALL running jobs have finished their priority files
                     while (Interlocked.CompareExchange(ref GlobalPriorityFilesCount, 0, 0) > 0)
                     {
-                        // Sleep briefly to prevent high CPU usage while waiting
                         await Task.Delay(200);
                     }
 
@@ -117,7 +107,6 @@ namespace EasySave.Services
             }
             finally
             {
-                // Failsafe: Ensure state is always reset to END even if an exception occurs
                 lock (_stateLock)
                 {
                     _stateTracker.UpdateState(job.Name, s =>
@@ -135,23 +124,18 @@ namespace EasySave.Services
             }
         }
 
-        // Extracted file processing logic to avoid code duplication
         private async Task ProcessSingleFileAsync(string file, BackupJob job)
         {
             string currentBlockingSoftware = GetRunningBusinessSoftware();
-            if (currentBlockingSoftware != null)
-            {
-                throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{currentBlockingSoftware}'.");
-            }
+
+            // Check blocking software at the individual file level
+            if (currentBlockingSoftware != null) throw new InvalidOperationException($"BLOCKING|{currentBlockingSoftware}");
 
             string relativePath = Path.GetRelativePath(job.SourceDirectory, file);
             string targetFile = Path.Combine(job.TargetDirectory, relativePath);
 
             string targetFileDir = Path.GetDirectoryName(targetFile);
-            if (!Directory.Exists(targetFileDir))
-            {
-                Directory.CreateDirectory(targetFileDir);
-            }
+            if (!Directory.Exists(targetFileDir)) Directory.CreateDirectory(targetFileDir);
 
             bool shouldCopy = true;
             FileInfo sourceFileInfo = new FileInfo(file);
@@ -179,15 +163,15 @@ namespace EasySave.Services
 
             if (shouldCopy)
             {
-                await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
+                await CopyFileWithLoggingAsync(file, targetFile, job, sourceFileInfo.Length);
             }
         }
 
-        private async Task CopyFileWithLoggingAsync(string source, string target, string jobName, long fileSize)
+        private async Task CopyFileWithLoggingAsync(string source, string target, BackupJob job, long fileSize)
         {
             lock (_stateLock)
             {
-                _stateTracker.UpdateState(jobName, s =>
+                _stateTracker.UpdateState(job.Name, s =>
                 {
                     s.SourceFilePath = source;
                     s.TargetFilePath = target;
@@ -201,42 +185,20 @@ namespace EasySave.Services
             bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>())
                                  .Contains(Path.GetExtension(source).ToLower());
 
-                if (shouldEncrypt)
-                {
-                    string cryptoSoftPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
+            try
+            {
+                stopwatch.Start();
 
-                    if (File.Exists(cryptoSoftPath))
-                    {
-                        ProcessStartInfo startInfo = new ProcessStartInfo
-                        {
-                            FileName = cryptoSoftPath,
-                            Arguments = $"\"{source}\" \"{target}\"",
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        };
+                if (shouldEncrypt) ExecuteCryptoSoft(source, target);
+                else File.Copy(source, target, true);
 
-                        using (Process process = Process.Start(startInfo))
-                        {
-                            process.WaitForExit();
-                            if (process.ExitCode != 0) throw new Exception("Erreur d'exécution de CryptoSoft.");
-                        }
-                    }
-                    else
-                    {
-                        throw new FileNotFoundException("Exécutable CryptoSoft.exe introuvable.");
-                    }
-                }
-                else
-                {
-                    File.Copy(source, target, true);
-                }
-
-            long fileSize = new FileInfo(source).Length;
+                stopwatch.Stop();
+                timeMs = stopwatch.ElapsedMilliseconds;
 
                 int currentProgress = 0;
                 lock (_stateLock)
                 {
-                    _stateTracker.UpdateState(jobName, s =>
+                    _stateTracker.UpdateState(job.Name, s =>
                     {
                         s.NbFilesLeftToDo--;
                         s.RemainingFilesSize -= fileSize;
@@ -245,7 +207,7 @@ namespace EasySave.Services
                     });
                 }
 
-                OnJobProgress?.Invoke(jobName, currentProgress);
+                OnJobProgress?.Invoke(job.Name, currentProgress);
                 OnProgressUpdate?.Invoke(source, 0);
             }
             catch (Exception)
@@ -254,21 +216,20 @@ namespace EasySave.Services
                 timeMs = -1;
             }
 
-            // Appel modifié pour inclure l'ID du job et le format de log
             await DailyLogger.Instance.WriteLogAsync(new LogEntry
             {
                 Name = job.Name,
                 FileSource = source,
                 FileTarget = target,
                 FileSize = fileSize,
-                FileTransferTime = sw.ElapsedMilliseconds
+                FileTransferTime = timeMs
             }, job.Id.ToString(), settings.LogFormat);
         }
 
         private void ExecuteCryptoSoft(string source, string target)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
-            if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe manquant.");
+            if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe missing.");
 
             ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\"")
             { CreateNoWindow = true, UseShellExecute = false };

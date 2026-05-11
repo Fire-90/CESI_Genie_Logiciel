@@ -20,13 +20,10 @@ namespace EasySave.ViewModels
         private readonly StateTracker _stateTracker;
         private readonly NetworkService _networkService;
         private readonly SynchronizationContext _syncContext;
-
-        // Context used to safely update the UI thread from background tasks
         private readonly SynchronizationContext _uiContext;
 
         public LanguageService LanguageService { get; } = new LanguageService();
 
-        // --- PROPRIÉTÉS DES TRAVAUX ---
         public ObservableCollection<JobViewModel> Jobs { get; }
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
         public bool IsJobSelected => SelectedJob != null;
@@ -62,7 +59,6 @@ namespace EasySave.ViewModels
             }
         }
 
-        // --- PROPRIÉTÉS DES PARAMÈTRES ---
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
 
@@ -116,31 +112,21 @@ namespace EasySave.ViewModels
             {
                 if (CurrentSettings != null)
                 {
-                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                                          .Select(e => e.Trim())
-                                          .ToList();
+                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim()).ToList();
                     CurrentSettings.EncryptedExtensions = extensions;
                     OnPropertyChanged(nameof(EncryptedExtensionsString));
                 }
             }
         }
 
-        // Handles UI binding for priority extensions separated by semicolons
         public string PriorityExtensionsString
         {
-            get
-            {
-                if (CurrentSettings?.PriorityExtensions == null) return "";
-                return string.Join(";", CurrentSettings.PriorityExtensions);
-            }
+            get => CurrentSettings?.PriorityExtensions == null ? "" : string.Join(";", CurrentSettings.PriorityExtensions);
             set
             {
                 if (CurrentSettings != null)
                 {
-                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                                          .Select(e => e.Trim())
-                                          .ToList();
-
+                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim()).ToList();
                     CurrentSettings.PriorityExtensions = extensions;
                     OnPropertyChanged(nameof(PriorityExtensionsString));
                 }
@@ -163,7 +149,6 @@ namespace EasySave.ViewModels
 
         public string SelectedSoftware { get; set; }
 
-        // --- PROPRIÉTÉS POUR LES PROCESSUS ET LE RESEAU ---
         private ObservableCollection<ProcessInfo> _processes;
         public ObservableCollection<ProcessInfo> Processes
         {
@@ -190,7 +175,6 @@ namespace EasySave.ViewModels
             set { _remoteStates = value; OnPropertyChanged(nameof(RemoteStates)); }
         }
 
-        // --- COMMANDES ---
         public ICommand AddJobCommand { get; }
         public ICommand ExecuteSelectionCommand { get; }
         public ICommand DeleteJobCommand { get; }
@@ -210,16 +194,12 @@ namespace EasySave.ViewModels
             _networkService = networkService;
 
             _uiContext = SynchronizationContext.Current;
-
-            CurrentSettings = _configManager.LoadSettings();
+            _syncContext = SynchronizationContext.Current;
 
             CurrentSettings = _configManager.LoadSettings();
             Jobs = new ObservableCollection<JobViewModel>(CurrentSettings.Jobs.Select(j => new JobViewModel(j)));
 
-            foreach (var job in Jobs)
-            {
-                job.PropertyChanged += OnJobPropertyChanged;
-            }
+            foreach (var job in Jobs) job.PropertyChanged += OnJobPropertyChanged;
 
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
             Processes = new ObservableCollection<ProcessInfo>();
@@ -245,20 +225,17 @@ namespace EasySave.ViewModels
 
             _backupEngine.OnJobProgress += (jobName, progress) =>
             {
-                if (_uiContext != null)
+                _uiContext?.Post(_ =>
                 {
-                    _uiContext.Post(_ =>
-                    {
-                        var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
-                        if (jobVm != null) jobVm.Progress = progress;
-                    }, null);
-                }
+                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
+                    if (jobVm != null) jobVm.Progress = progress;
+                }, null);
             };
 
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
-            ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
+            ChangeLanguageCommand = new RelayCommand(lang => ChangeLanguage(lang));
             ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
             AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
@@ -266,7 +243,7 @@ namespace EasySave.ViewModels
             StopProcessCommand = new RelayCommand(ExecuteStopProcess, CanStopProcess);
             RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
 
-            ChangeLanguage(CurrentSettings.Language);
+            LanguageService.CurrentLanguage = CurrentSettings.Language;
             ExecuteRefreshProcesses(null);
         }
 
@@ -311,33 +288,25 @@ namespace EasySave.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Action showErrorAction = () => CurrentFile = $"Erreur : {ex.Message}";
+                    Action showErrorAction = () => CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
                     if (_syncContext != null) _syncContext.Post(_ => showErrorAction(), null);
                     else showErrorAction();
                 }
             }
         }
+
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            // Ignore UI-only property changes to prevent recursive save operations
-            if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected")
-            {
-                return;
-            }
-
+            if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected") return;
             SaveConfig();
         }
-
-        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e) => SaveConfig();
 
         private void ChangeLanguage(object param)
         {
             string lang = param as string ?? "EN";
-
             CurrentSettings.Language = lang;
             CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
-
             LanguageService.CurrentLanguage = lang;
         }
 
@@ -378,7 +347,6 @@ namespace EasySave.ViewModels
         private async void ExecuteSelectedJob(object parameter)
         {
             var jobsToRun = Jobs.Where(j => j.IsSelected).ToList();
-
             if (!jobsToRun.Any())
             {
                 CurrentFile = LanguageService["MsgEmptyPath"];
@@ -387,16 +355,50 @@ namespace EasySave.ViewModels
 
             try
             {
-                CurrentFile = "Démarrage...";
-                _networkService.SendMessage($"[START] {SelectedJob.Name}");
-                await _backupEngine.ExecuteJobAsync(SelectedJob.Model);
-                CurrentFile = "Succès !";
-                _networkService.SendMessage($"[END] {SelectedJob.Name} - Succes");
+                CurrentFile = LanguageService["MsgStartGlobal"];
+                var tasks = new List<Task>();
+
+                foreach (var jobVm in jobsToRun)
+                {
+                    if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
+
+                    jobVm.Progress = 0;
+                    _networkService.SendMessage($"[START] {jobVm.Name}");
+
+                    // Offload execution to a background thread
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _backupEngine.ExecuteJobAsync(jobVm.Model);
+                            _networkService.SendMessage($"[END] {jobVm.Name} - Success");
+                        }
+                        catch (Exception ex)
+                        {
+                            // Route blocking exceptions through the Language Service
+                            string errorMsg = (ex is InvalidOperationException && ex.Message.StartsWith("BLOCKING|"))
+                                ? $"{LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
+                                : $"{LanguageService["MsgError"]} {ex.Message}";
+
+                            _uiContext?.Post(_ => CurrentFile = errorMsg, null);
+                            _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                        }
+                    }));
+                }
+
+                await Task.WhenAll(tasks);
+
+                // Do not overwrite errors with success if tasks failed. 
+                // Only show global success if the current file message isn't already an error.
+                if (!CurrentFile.Contains("❌"))
+                {
+                    CurrentFile = LanguageService["MsgSuccessGlobal"];
+                }
             }
             catch (Exception ex)
             {
-                CurrentFile = $"Erreur : {ex.Message}";
-                _networkService.SendMessage($"[ERROR] {SelectedJob.Name} : {ex.Message}");
+                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
+                _networkService.SendMessage($"[ERROR] Global error: {ex.Message}");
             }
         }
 
@@ -404,22 +406,47 @@ namespace EasySave.ViewModels
         {
             try
             {
-                CurrentFile = "Démarrage...";
+                CurrentFile = LanguageService["MsgStartGlobal"];
+                var tasks = new List<Task>();
+
                 foreach (var id in ids)
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
+                    jobVm.Progress = 0;
                     _networkService.SendMessage($"[START] {jobVm.Name}");
-                    await _backupEngine.ExecuteJobAsync(jobVm.Model);
-                    _networkService.SendMessage($"[END] {jobVm.Name} - Succes");
+
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _backupEngine.ExecuteJobAsync(jobVm.Model);
+                            _networkService.SendMessage($"[END] {jobVm.Name} - Success");
+                        }
+                        catch (Exception ex)
+                        {
+                            string errorMsg = (ex is InvalidOperationException && ex.Message.StartsWith("BLOCKING|"))
+                                ? $"{LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
+                                : $"{LanguageService["MsgError"]} {ex.Message}";
+
+                            _uiContext?.Post(_ => CurrentFile = errorMsg, null);
+                            _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                        }
+                    }));
                 }
-                CurrentFile = "Terminé avec succès !";
+
+                await Task.WhenAll(tasks);
+
+                if (!CurrentFile.Contains("❌"))
+                {
+                    CurrentFile = LanguageService["MsgSuccessGlobal"];
+                }
             }
             catch (Exception ex)
             {
-                CurrentFile = $"Erreur : {ex.Message}";
-                _networkService.SendMessage($"[ERROR] Erreur globale : {ex.Message}");
+                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
+                _networkService.SendMessage($"[ERROR] Global error: {ex.Message}");
             }
         }
 
@@ -458,7 +485,7 @@ namespace EasySave.ViewModels
             }
             catch (Exception ex)
             {
-                CurrentFile = $"Erreur rafraîchissement : {ex.Message}";
+                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
             }
         }
 
@@ -477,13 +504,12 @@ namespace EasySave.ViewModels
             }
             catch (Exception ex)
             {
-                CurrentFile = $"Erreur arrêt : {ex.Message}";
+                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
             }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     public class ProcessInfo : INotifyPropertyChanged
