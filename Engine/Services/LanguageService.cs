@@ -54,7 +54,7 @@ namespace EasySave.Services
                 { "Softwares", "Business Softwares:" },
                 { "LblLogFormat", "Log Format:" },
                 { "LblLogDestination", "Log Destination:" },
-                { "LblMaxParallelSize", "Max Parallel File Size (KB):" },
+                { "LblMaxParallelSize", "Max Parallel File Size:" },
                 { "LblEncryptedExt", "Encryption Extensions:" },
                 { "LblEncryptionKey", "Encryption Key:" },
                 { "LblPriorityExt", "Priority Extensions:" },
@@ -70,6 +70,7 @@ namespace EasySave.Services
                 { "StateActive", "ACTIVE" },
                 { "StateSuspended", "SUSPENDED" },
                 { "StateWaiting", "WAITING" },
+                { "StateBlocked", "BLOCKED" },
                 { "StateStopped", "JUST STOPPED" },
                 { "StateFinished", "FINISHED" },
 
@@ -113,7 +114,7 @@ namespace EasySave.Services
                 { "Softwares", "Logiciels métiers :" },
                 { "LblLogFormat", "Format des logs :" },
                 { "LblLogDestination", "Destination des logs :" },
-                { "LblMaxParallelSize", "Taille max transfert parallèle (Ko) :" },
+                { "LblMaxParallelSize", "Taille max transfert parallèle :" },
                 { "LblEncryptedExt", "Extensions à chiffrer :" },
                 { "LblEncryptionKey", "Clé de chiffrement :" },
                 { "LblPriorityExt", "Extensions prioritaires :" },
@@ -129,6 +130,7 @@ namespace EasySave.Services
                 { "StateActive", "ACTIF" },
                 { "StateSuspended", "SUSPENDU" },
                 { "StateWaiting", "EN ATTENTE" },
+                { "StateBlocked", "BLOQUÉ" },
                 { "StateStopped", "ARRÊTÉ" },
                 { "StateFinished", "TERMINÉ" },
 

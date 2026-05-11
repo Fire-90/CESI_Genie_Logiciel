@@ -64,6 +64,7 @@ namespace EasySave.ViewModels
 
         public List<string> AvailableLogFormats { get; } = new List<string> { "JSON", "XML" };
         public List<string> AvailableLogDestinations { get; } = new List<string> { "LocalOnly", "ServerOnly", "LocalAndServer" };
+        public List<string> AvailableSizeUnits { get; } = new List<string> { "Ko", "Mo", "Go" };
 
         public string SelectedLogFormat
         {
@@ -122,16 +123,29 @@ namespace EasySave.ViewModels
             }
         }
 
-        // NOUVEAUX CHAMPS
-        public long MaxParallelFileSizeLimitKb
+        public long MaxParallelFileSizeLimit
         {
-            get => CurrentSettings?.MaxParallelFileSizeLimitKb ?? 50000;
+            get => CurrentSettings?.MaxParallelFileSizeLimit ?? 50000;
             set
             {
-                if (CurrentSettings != null && CurrentSettings.MaxParallelFileSizeLimitKb != value)
+                if (CurrentSettings != null && CurrentSettings.MaxParallelFileSizeLimit != value)
                 {
-                    CurrentSettings.MaxParallelFileSizeLimitKb = value;
-                    OnPropertyChanged(nameof(MaxParallelFileSizeLimitKb));
+                    CurrentSettings.MaxParallelFileSizeLimit = value;
+                    OnPropertyChanged(nameof(MaxParallelFileSizeLimit));
+                    SaveConfig();
+                }
+            }
+        }
+
+        public string MaxParallelFileSizeLimitUnit
+        {
+            get => CurrentSettings?.MaxParallelFileSizeLimitUnit ?? "Ko";
+            set
+            {
+                if (CurrentSettings != null && CurrentSettings.MaxParallelFileSizeLimitUnit != value)
+                {
+                    CurrentSettings.MaxParallelFileSizeLimitUnit = value;
+                    OnPropertyChanged(nameof(MaxParallelFileSizeLimitUnit));
                     SaveConfig();
                 }
             }
@@ -277,6 +291,18 @@ namespace EasySave.ViewModels
 
                 if (_uiContext != null) _uiContext.Post(_ => updateWait(), null);
                 else updateWait();
+            };
+
+            _backupEngine.OnJobBlocked += (jobName, isBlocked) =>
+            {
+                Action updateBlock = () =>
+                {
+                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
+                    if (jobVm != null) jobVm.IsBlocked = isBlocked;
+                };
+
+                if (_uiContext != null) _uiContext.Post(_ => updateBlock(), null);
+                else updateBlock();
             };
 
             _backupEngine.OnJobProgress += (jobName, progress) =>
@@ -510,7 +536,8 @@ namespace EasySave.ViewModels
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" ||
-                e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsWaiting") return;
+                e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" ||
+                e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked") return;
 
             SaveConfig();
         }
@@ -572,6 +599,7 @@ namespace EasySave.ViewModels
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
                     jobVm.IsWaiting = false;
+                    jobVm.IsBlocked = false;
 
                     var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
                     if (propertyInfo != null && propertyInfo.CanWrite)
@@ -607,6 +635,7 @@ namespace EasySave.ViewModels
                             {
                                 jobVm.IsRunning = false;
                                 jobVm.IsWaiting = false;
+                                jobVm.IsBlocked = false;
                                 if (jobVm.Progress < 100) jobVm.Progress = 0;
                             };
 
@@ -640,6 +669,7 @@ namespace EasySave.ViewModels
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
                     jobVm.IsWaiting = false;
+                    jobVm.IsBlocked = false;
 
                     var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
                     if (propertyInfo != null && propertyInfo.CanWrite)
@@ -672,6 +702,7 @@ namespace EasySave.ViewModels
                         {
                             jobVm.IsRunning = false;
                             jobVm.IsWaiting = false;
+                            jobVm.IsBlocked = false;
                             if (jobVm.Progress < 100) jobVm.Progress = 0;
                         };
 
@@ -726,6 +757,7 @@ namespace EasySave.ViewModels
                 _backupEngine.StopJob(job.Name);
                 job.IsRunning = false;
                 job.IsWaiting = false;
+                job.IsBlocked = false;
 
                 var propertyInfo = job.GetType().GetProperty("IsPaused");
                 if (propertyInfo != null && propertyInfo.CanWrite)

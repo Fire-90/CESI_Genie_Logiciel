@@ -90,6 +90,13 @@ namespace EasySave.ViewModels
             set { _isWaiting = value; OnPropertyChanged(nameof(IsWaiting)); }
         }
 
+        private bool _isBlocked;
+        public bool IsBlocked
+        {
+            get => _isBlocked;
+            set { _isBlocked = value; OnPropertyChanged(nameof(IsBlocked)); }
+        }
+
         private bool _isPaused;
         public bool IsPaused
         {

@@ -39,7 +39,7 @@ namespace EasySave.Services
                     }
                     catch (IOException)
                     {
-                        if (i == maxRetries - 1) throw; // Si on échoue après 5 essais
+                        if (i == maxRetries - 1) throw;
                         Thread.Sleep(50);
                     }
                     catch (JsonException)
@@ -57,7 +57,6 @@ namespace EasySave.Services
             var settings = new AppSettings();
             for (int i = 1; i <= 5; i++)
             {
-                // Création de 5 emplacements vides par défaut
                 settings.Jobs.Add(new BackupJob(i, $"Save{i}", "", "", BackupType.Full));
             }
 
@@ -118,8 +117,9 @@ namespace EasySave.Services
         public string ServerIP { get; set; } = "127.0.0.1";
         public string ClientName { get; set; } = "Client-" + Environment.MachineName;
 
-        public long MaxParallelFileSizeLimitKb { get; set; } = 50000; // Par défaut : 50 Mo
-        public string EncryptionKey { get; set; } = "EasySaveKey"; // Par défaut
+        public long MaxParallelFileSizeLimit { get; set; } = 50000;
+        public string MaxParallelFileSizeLimitUnit { get; set; } = "Ko"; // Unité par défaut
+        public string EncryptionKey { get; set; } = "EasySaveKey";
 
         public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
         public List<string> BusinessSoftwares { get; set; } = new List<string> { "calculator", "notepad" };

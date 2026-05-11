@@ -38,7 +38,14 @@
 							<ComboBox ItemsSource="{Binding AvailableLogDestinations}" SelectedItem="{Binding SelectedLogDestination, Mode=TwoWay}" Height="35" Padding="5" Margin="0,0,0,20"/>
 
 							<TextBlock Text="{Binding LanguageService[LblMaxParallelSize]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-							<TextBox Text="{Binding MaxParallelFileSizeLimitKb, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
+							<Grid Margin="0,0,0,20">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="70"/>
+								</Grid.ColumnDefinitions>
+								<TextBox Grid.Column="0" Text="{Binding MaxParallelFileSizeLimit, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center" Margin="0,0,10,0"/>
+								<ComboBox Grid.Column="1" ItemsSource="{Binding AvailableSizeUnits}" SelectedItem="{Binding MaxParallelFileSizeLimitUnit, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
+							</Grid>
 						</StackPanel>
 					</Border>
 

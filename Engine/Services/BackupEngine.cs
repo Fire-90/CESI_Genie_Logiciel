@@ -17,21 +17,17 @@ namespace EasySave.Services
         public event ProgressUpdateHandler OnProgressUpdate;
         public event Action<string, int> OnJobProgress;
         public event Action<string, bool> OnJobWaiting;
+        public event Action<string, bool> OnJobBlocked;
 
         private readonly StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
 
-        // Global counter for priority files across all threads (Barrier concept)
         private static int GlobalPriorityFilesCount = 0;
 
-        // Verrou CryptoSoft global (Mono-Instance)
         private static readonly SemaphoreSlim _cryptoSoftLock = new SemaphoreSlim(1, 1);
-
-        // Verrou global pour limiter le transfert simultané de fichiers lourds à UN SEUL fichier à la fois
         private static readonly SemaphoreSlim _largeFileLock = new SemaphoreSlim(1, 1);
 
-        // Thread control for Pause and Stop
         private readonly ConcurrentDictionary<string, ManualResetEvent> _jobPauseEvents = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellationTokens = new();
 
@@ -40,8 +36,6 @@ namespace EasySave.Services
             _stateTracker = stateTracker;
             _configManager = configManager;
         }
-
-        // --- TEAMMATE'S FEATURE: PAUSE / RESUME / STOP ---
 
         public void PauseJob(string jobName)
         {
@@ -56,10 +50,8 @@ namespace EasySave.Services
         public void StopJob(string jobName)
         {
             if (_jobCancellationTokens.TryGetValue(jobName, out var cts)) cts.Cancel();
-            ResumeJob(jobName); // Force resume to allow the thread to reach the cancellation token and die
+            ResumeJob(jobName);
         }
-
-        // -------------------------------------------------
 
         private string GetRunningBusinessSoftware()
         {
@@ -105,7 +97,8 @@ namespace EasySave.Services
             int totalFilesToCopy = priorityFiles.Count + normalFiles.Count;
             long totalFilesSize = allFiles.Sum(f => new FileInfo(f).Length);
 
-            Interlocked.Add(ref GlobalPriorityFilesCount, priorityFiles.Count);
+            int remainingPriorityFiles = priorityFiles.Count;
+            Interlocked.Add(ref GlobalPriorityFilesCount, remainingPriorityFiles);
 
             lock (_stateLock)
             {
@@ -122,17 +115,22 @@ namespace EasySave.Services
 
             try
             {
-                // Step 1: Priority files
                 foreach (string file in priorityFiles)
                 {
                     pauseEvent.WaitOne();
                     cts.Token.ThrowIfCancellationRequested();
 
-                    await ProcessSingleFileAsync(file, job);
-                    Interlocked.Decrement(ref GlobalPriorityFilesCount);
+                    try
+                    {
+                        await ProcessSingleFileAsync(file, job);
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref GlobalPriorityFilesCount);
+                        remainingPriorityFiles--;
+                    }
                 }
 
-                // Step 2: Normal files (Barrier)
                 foreach (string file in normalFiles)
                 {
                     while (Interlocked.CompareExchange(ref GlobalPriorityFilesCount, 0, 0) > 0)
@@ -153,6 +151,12 @@ namespace EasySave.Services
             }
             finally
             {
+                // Libère la barrière au cas où un fichier a causé un crash 
+                if (remainingPriorityFiles > 0)
+                {
+                    Interlocked.Add(ref GlobalPriorityFilesCount, -remainingPriorityFiles);
+                }
+
                 _jobCancellationTokens.TryRemove(job.Name, out _);
                 _jobPauseEvents.TryRemove(job.Name, out _);
 
@@ -232,23 +236,48 @@ namespace EasySave.Services
             bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>())
                                  .Contains(Path.GetExtension(source).ToLower());
 
-            // Convertir la taille max paramétrée (Ko) en octets
-            long limitInBytes = settings.MaxParallelFileSizeLimitKb * 1024L;
+            long limitValue = settings.MaxParallelFileSizeLimit;
+            long multiplier = settings.MaxParallelFileSizeLimitUnit switch
+            {
+                "Mo" => 1024L * 1024L,
+                "Go" => 1024L * 1024L * 1024L,
+                _ => 1024L // "Ko"
+            };
+
+            long limitInBytes = limitValue * multiplier;
             bool isLargeFile = fileSize > limitInBytes;
+            bool isBlockedFired = false;
 
             try
             {
-                // Si le fichier est lourd, il doit attendre que le verrou de gros fichiers soit libre
                 if (isLargeFile)
                 {
-                    await _largeFileLock.WaitAsync();
+                    // Tente de récupérer le verrou immédiatement
+                    bool acquired = await _largeFileLock.WaitAsync(0);
+                    if (!acquired)
+                    {
+                        isBlockedFired = true;
+                        OnJobBlocked?.Invoke(job.Name, true);
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED");
+                        }
+
+                        // Patiente pour de vrai
+                        await _largeFileLock.WaitAsync();
+
+                        OnJobBlocked?.Invoke(job.Name, false);
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE");
+                        }
+                    }
                 }
 
                 try
                 {
                     stopwatch.Start();
 
-                    // On envoie la clé choisie par l'utilisateur à CryptoSoft
                     if (shouldEncrypt) ExecuteCryptoSoft(source, target, job, settings.EncryptionKey);
                     else File.Copy(source, target, true);
 
@@ -278,7 +307,6 @@ namespace EasySave.Services
             }
             finally
             {
-                // Libérer le verrou pour permettre au prochain fichier lourd d'être copié
                 if (isLargeFile)
                 {
                     _largeFileLock.Release();
@@ -302,7 +330,8 @@ namespace EasySave.Services
 
             bool isWaitingFired = false;
 
-            if (_cryptoSoftLock.CurrentCount == 0)
+            bool acquired = _cryptoSoftLock.Wait(0);
+            if (!acquired)
             {
                 isWaitingFired = true;
                 OnJobWaiting?.Invoke(job.Name, true);
@@ -310,25 +339,20 @@ namespace EasySave.Services
                 {
                     _stateTracker.UpdateState(job.Name, s => s.State = "WAITING");
                 }
-            }
 
-            _cryptoSoftLock.Wait();
+                _cryptoSoftLock.Wait();
+
+                OnJobWaiting?.Invoke(job.Name, false);
+                lock (_stateLock)
+                {
+                    _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE");
+                }
+            }
 
             try
             {
-                if (isWaitingFired)
-                {
-                    OnJobWaiting?.Invoke(job.Name, false);
-                    lock (_stateLock)
-                    {
-                        _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE");
-                    }
-                }
-
-                // Récupération de la clé paramétrée, par défaut "EasySaveKey" si c'est vide
                 string safeKey = string.IsNullOrWhiteSpace(encryptionKey) ? "EasySaveKey" : encryptionKey;
 
-                // Lancement de CryptoSoft en lui passant la clé en 3ème argument
                 ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\" \"{safeKey}\"")
                 {
                     CreateNoWindow = true,
