@@ -16,7 +16,7 @@ namespace EasySave.Services
         public event ProgressUpdateHandler OnProgressUpdate;
         public event Action<string, int> OnJobProgress;
 
-        private StateTracker _stateTracker;
+        private readonly StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
 
@@ -32,11 +32,9 @@ namespace EasySave.Services
         private string GetRunningBusinessSoftware()
         {
             var settings = _configManager.LoadSettings();
-            var businessSoftwares = settings.BusinessSoftwares;
+            if (settings.BusinessSoftwares == null) return null;
 
-            if (businessSoftwares == null) return null;
-
-            foreach (string software in businessSoftwares)
+            foreach (string software in settings.BusinessSoftwares)
             {
                 if (string.IsNullOrWhiteSpace(software)) continue;
 
@@ -48,18 +46,11 @@ namespace EasySave.Services
 
         public async Task ExecuteJobAsync(BackupJob job)
         {
-            string blockingSoftware = GetRunningBusinessSoftware();
-            if (blockingSoftware != null)
-            {
-                throw new Exception($"Lancement impossible : Le logiciel métier '{blockingSoftware}' est ouvert.");
-            }
+            string blocking = GetRunningBusinessSoftware();
+            if (blocking != null) throw new Exception($"Logiciel bloquant détecté : {blocking}");
 
-            if (string.IsNullOrWhiteSpace(job.SourceDirectory) || !Directory.Exists(job.SourceDirectory))
-            {
-                throw new DirectoryNotFoundException($"Source invalide ou introuvable pour {job.Name}");
-            }
+            if (!Directory.Exists(job.SourceDirectory)) throw new DirectoryNotFoundException("Source introuvable.");
 
-            // 1. Gather all files and Settings
             string[] allFiles = Directory.GetFiles(job.SourceDirectory, "*.*", SearchOption.AllDirectories);
             var settings = _configManager.LoadSettings();
             List<string> priorityExtensions = settings.PriorityExtensions ?? new List<string>();
@@ -207,13 +198,8 @@ namespace EasySave.Services
             long timeMs = 0;
 
             var settings = _configManager.LoadSettings();
-            List<string> encryptedExtensions = settings.EncryptedExtensions ?? new List<string>();
-            string fileExtension = Path.GetExtension(source).ToLower();
-            bool shouldEncrypt = encryptedExtensions.Contains(fileExtension);
-
-            try
-            {
-                stopwatch.Start();
+            bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>())
+                                 .Contains(Path.GetExtension(source).ToLower());
 
                 if (shouldEncrypt)
                 {
@@ -245,8 +231,7 @@ namespace EasySave.Services
                     File.Copy(source, target, true);
                 }
 
-                stopwatch.Stop();
-                timeMs = stopwatch.ElapsedMilliseconds;
+            long fileSize = new FileInfo(source).Length;
 
                 int currentProgress = 0;
                 lock (_stateLock)
@@ -269,14 +254,27 @@ namespace EasySave.Services
                 timeMs = -1;
             }
 
+            // Appel modifié pour inclure l'ID du job et le format de log
             await DailyLogger.Instance.WriteLogAsync(new LogEntry
             {
-                Name = jobName,
+                Name = job.Name,
                 FileSource = source,
                 FileTarget = target,
                 FileSize = fileSize,
-                FileTransferTime = timeMs
-            });
+                FileTransferTime = sw.ElapsedMilliseconds
+            }, job.Id.ToString(), settings.LogFormat);
+        }
+
+        private void ExecuteCryptoSoft(string source, string target)
+        {
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
+            if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe manquant.");
+
+            ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\"")
+            { CreateNoWindow = true, UseShellExecute = false };
+
+            using Process p = Process.Start(psi);
+            p.WaitForExit();
         }
     }
 }

@@ -35,27 +35,25 @@ namespace EasyLog
         private static readonly Lazy<DailyLogger> _instance = new Lazy<DailyLogger>(() => new DailyLogger());
         public static DailyLogger Instance => _instance.Value;
 
-        private readonly string _logDirectory;
+        private readonly string _baseDataDirectory;
         private readonly string _settingsFilePath;
         private static readonly object _lockObj = new object();
+
+        // Événement déclenché à chaque nouveau log généré (JobId, Format, Entry)
+        public static event Action<string, string, LogEntry> OnLogGenerated;
 
         private DailyLogger()
         {
             string exePath = AppDomain.CurrentDomain.BaseDirectory;
-            _logDirectory = Path.Combine(exePath, "data", "logs");
-
-            // Nouveau chemin vers les paramètres partagés
-            _settingsFilePath = Path.Combine(exePath, "data", "settings.json");
-
-            if (!Directory.Exists(_logDirectory))
-            {
-                Directory.CreateDirectory(_logDirectory);
-            }
+            _baseDataDirectory = Path.Combine(exePath, "Data");
+            _settingsFilePath = Path.Combine(exePath, "Data", "settings.json");
         }
 
-        // NOUVEAU : Lecture dynamique du format depuis settings.json
-        private string GetCurrentLogFormat()
+        // Récupère à la fois le format et la destination des logs
+        private (string format, string destination) GetLogSettings()
         {
+            string format = "json";
+            string destination = "LocalAndServer";
             try
             {
                 if (File.Exists(_settingsFilePath))
@@ -65,42 +63,63 @@ namespace EasyLog
                     {
                         if (doc.RootElement.TryGetProperty("LogFormat", out JsonElement formatElement))
                         {
-                            return formatElement.GetString() ?? "json";
+                            format = formatElement.GetString() ?? "json";
+                        }
+                        if (doc.RootElement.TryGetProperty("LogDestination", out JsonElement destElement))
+                        {
+                            destination = destElement.GetString() ?? "LocalAndServer";
                         }
                     }
                 }
             }
-            catch
-            {
-                // En cas d'erreur de lecture, on garde le JSON par défaut
-            }
-            return "json";
+            catch { }
+            return (format, destination);
         }
 
-        public async Task WriteLogAsync(LogEntry entry)
+        public async Task WriteLogAsync(LogEntry entry, string jobId, string logFormat = null)
         {
-            // Récupération du format de journal actuel avant d'écrire
-            string currentFormat = GetCurrentLogFormat();
+            var settings = GetLogSettings();
+            string currentFormat = logFormat ?? settings.format;
+            string destination = settings.destination;
 
-            lock (_lockObj)
+            string logDirectory = Path.Combine(_baseDataDirectory, "logs");
+
+            // --- SAUVEGARDE LOCALE ---
+            if (destination.Equals("LocalOnly", StringComparison.OrdinalIgnoreCase) ||
+                destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
             {
-                if (currentFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
+                lock (_lockObj)
                 {
-                    WriteXmlLog(entry);
+                    if (!Directory.Exists(logDirectory))
+                    {
+                        Directory.CreateDirectory(logDirectory);
+                    }
+
+                    if (currentFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
+                    {
+                        WriteXmlLog(entry, logDirectory);
+                    }
+                    else
+                    {
+                        WriteJsonLog(entry, logDirectory);
+                    }
                 }
-                else
-                {
-                    WriteJsonLog(entry);
-                }
+            }
+
+            // --- ENVOI AU SERVEUR (Via Événement) ---
+            if (destination.Equals("ServerOnly", StringComparison.OrdinalIgnoreCase) ||
+                destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
+            {
+                OnLogGenerated?.Invoke(jobId, currentFormat, entry);
             }
 
             await Task.CompletedTask;
         }
 
-        private void WriteJsonLog(LogEntry entry)
+        private void WriteJsonLog(LogEntry entry, string logDirectory)
         {
             string fileName = $"{DateTime.Now:yyyy-MM-dd}.json";
-            string filePath = Path.Combine(_logDirectory, fileName);
+            string filePath = Path.Combine(logDirectory, fileName);
             List<LogEntry> logs = new List<LogEntry>();
 
             if (File.Exists(filePath))
@@ -113,21 +132,18 @@ namespace EasyLog
                         logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
                     }
                 }
-                catch (JsonException) { /* Fichier ignoré si corrompu */ }
+                catch (JsonException) { }
             }
 
             logs.Add(entry);
-
             var options = new JsonSerializerOptions { WriteIndented = true };
-            string jsonString = JsonSerializer.Serialize(logs, options);
-
-            File.WriteAllText(filePath, jsonString);
+            File.WriteAllText(filePath, JsonSerializer.Serialize(logs, options));
         }
 
-        private void WriteXmlLog(LogEntry entry)
+        private void WriteXmlLog(LogEntry entry, string logDirectory)
         {
             string fileName = $"{DateTime.Now:yyyy-MM-dd}.xml";
-            string filePath = Path.Combine(_logDirectory, fileName);
+            string filePath = Path.Combine(logDirectory, fileName);
             List<LogEntry> logs = new List<LogEntry>();
             XmlSerializer serializer = new XmlSerializer(typeof(List<LogEntry>));
 
@@ -140,11 +156,10 @@ namespace EasyLog
                         logs = (List<LogEntry>)serializer.Deserialize(fs);
                     }
                 }
-                catch (InvalidOperationException) { /* Fichier ignoré si corrompu */ }
+                catch (InvalidOperationException) { }
             }
 
             logs.Add(entry);
-
             using (FileStream fs = new FileStream(filePath, FileMode.Create))
             {
                 serializer.Serialize(fs, logs);

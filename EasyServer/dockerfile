@@ -1,0 +1,20 @@
+# Utilisation de l'image SDK pour builder l'application
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
+WORKDIR /App
+
+# Copie de tout le code source
+COPY . ./
+# Restauration et publication
+RUN dotnet restore
+RUN dotnet publish -c Release -o out
+
+# Création de l'image finale d'exécution (plus légère)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /App
+COPY --from=build-env /App/out .
+
+# Exposer le port réseau
+EXPOSE 11000
+
+# Lancer le serveur
+ENTRYPOINT ["dotnet", "EasyServer.dll"]

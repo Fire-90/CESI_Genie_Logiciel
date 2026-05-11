@@ -86,7 +86,11 @@ namespace EasySave.Services
     public class AppSettings
     {
         public string Language { get; set; } = "FR";
-        public string LogFormat { get; set; } = "JSON";
+        public string LogFormat { get; set; } = "json";
+        public string LogDestination { get; set; } = "LocalAndServer"; // LocalOnly, ServerOnly, LocalAndServer
+        public string ServerIP { get; set; } = "127.0.0.1";
+        public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
+
         public List<string> BusinessSoftwares { get; set; } = new List<string> { "calculator", "notepad" };
         public List<string> EncryptedExtensions { get; set; } = new List<string> { ".txt", ".docx" };
 

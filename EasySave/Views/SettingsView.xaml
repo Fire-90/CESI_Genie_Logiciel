@@ -1,0 +1,46 @@
+﻿<UserControl x:Class="Graphic.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="20">
+        <Border Background="White" CornerRadius="10" Padding="30" MaxWidth="800" VerticalAlignment="Top">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="15" Opacity="0.08" ShadowDepth="4"/>
+            </Border.Effect>
+
+            <StackPanel>
+                <TextBlock Text="{Binding LanguageService[Settings]}" FontSize="28" FontWeight="Bold" Margin="0,0,0,30" Foreground="#2C3E50"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="40"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Langue / Language" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,25">
+                            <Button Content="EN" Command="{Binding ChangeLanguageCommand}" CommandParameter="EN" Width="60" Height="35" Margin="0,0,10,0"/>
+                            <Button Content="FR" Command="{Binding ChangeLanguageCommand}" CommandParameter="FR" Width="60" Height="35"/>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding LanguageService[LblLogFormat]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat}" Height="35" Margin="0,0,0,25"/>
+
+                        <TextBlock Text="{Binding LanguageService[LblEncryptedExt]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <TextBox Text="{Binding EncryptedExtensionsString}" Height="35"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{Binding LanguageService[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ListBox ItemsSource="{Binding Softwares}" Height="130" Margin="0,0,0,10"/>
+                        <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" HorizontalAlignment="Right"/>
+                    </StackPanel>
+                </Grid>
+
+                <Separator Margin="0,30,0,20"/>
+                <Button Content="{Binding LanguageService[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Background="#2ECC71" Foreground="White" Padding="30,12" HorizontalAlignment="Right"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

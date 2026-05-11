@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Controls;
 using EasySave.ViewModels;
 using EasySave.Services;
 using EasySave.Models;
@@ -15,27 +16,23 @@ namespace Graphic
         {
             InitializeComponent();
 
-            // 1. Initialisation des services
             var configManager = new ConfigManager();
             var appSettings = configManager.LoadSettings();
             var stateTracker = new StateTracker(appSettings.Jobs);
             var engine = new BackupEngine(stateTracker, configManager);
 
-            // 2. Création du ViewModel
-            _mainViewModel = new MainViewModel(configManager, stateTracker, engine);
+            var networkService = new NetworkService(configManager);
+
+            _mainViewModel = new MainViewModel(configManager, stateTracker, engine, networkService);
             this.DataContext = _mainViewModel;
 
-            // 3. On demande à vérifier les arguments du terminal UNE FOIS que la fenêtre est chargée
             this.Loaded += MainWindow_Loaded;
         }
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // Récupère tout ce qui a été tapé dans le terminal
             string[] args = Environment.GetCommandLineArgs();
 
-            // args[0] est toujours le chemin "Graphic.exe"
-            // args[1] sera ton "1-2" ou "1;3"
             if (args.Length > 1)
             {
                 string inputArgs = args[1];
@@ -43,13 +40,23 @@ namespace Graphic
 
                 if (idsToExecute.Count > 0)
                 {
-                    // Lancement automatique !
                     await _mainViewModel.ExecuteJobsAsync(idsToExecute);
                 }
             }
         }
 
-        // Ton ancienne méthode de parsing récupérée de la Console !
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.Source is TabControl tabControl)
+            {
+                // Index 1 correspond à l'onglet "Processus"
+                if (tabControl.SelectedIndex == 1)
+                {
+                    _mainViewModel?.RefreshProcessesCommand.Execute(null);
+                }
+            }
+        }
+
         private List<int> ParseArgs(string arg)
         {
             var ids = new List<int>();
