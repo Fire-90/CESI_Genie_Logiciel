@@ -50,104 +50,87 @@ namespace EasyServer
 
         public async Task WriteConnectionLogAsync(ServerLogEntry entry, string clientId)
         {
-            string safeClientId = clientId.Replace(":", "-");
-            entry.ClientId = safeClientId;
+            string clientDir = Path.Combine(_baseDataDirectory, clientId.Replace(":", "-"), "logs");
+            if (!Directory.Exists(clientDir)) Directory.CreateDirectory(clientDir);
 
-            string filePath = Path.Combine(_baseDataDirectory, "connection_logs.json");
+            string filePath = Path.Combine(clientDir, "connection_history.json");
 
             lock (_lockObj)
             {
-                if (!Directory.Exists(_baseDataDirectory))
-                {
-                    Directory.CreateDirectory(_baseDataDirectory);
-                }
-
                 List<ServerLogEntry> logs = new List<ServerLogEntry>();
                 if (File.Exists(filePath))
                 {
-                    try
-                    {
-                        string existingJson = File.ReadAllText(filePath);
-                        if (!string.IsNullOrWhiteSpace(existingJson))
-                        {
-                            logs = JsonSerializer.Deserialize<List<ServerLogEntry>>(existingJson) ?? new List<ServerLogEntry>();
-                        }
-                    }
-                    catch (JsonException) { }
+                    try { logs = JsonSerializer.Deserialize<List<ServerLogEntry>>(File.ReadAllText(filePath)) ?? new List<ServerLogEntry>(); }
+                    catch { }
                 }
-
                 logs.Add(entry);
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                File.WriteAllText(filePath, JsonSerializer.Serialize(logs, options));
+                File.WriteAllText(filePath, JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true }));
             }
-
             await Task.CompletedTask;
         }
 
-        public async Task WriteClientBackupLogAsync(string jsonPayload, string clientId, string jobId, string format)
+        // --- MÉTHODE MANQUANTE AJOUTÉE ICI ---
+        public async Task WriteClientLogAsync(string jsonEntry, string clientId, string jobId, string format)
         {
-            string safeClientId = clientId.Replace(":", "-");
-            string logDirectory = Path.Combine(_baseDataDirectory, safeClientId, "logs");
+            string clientDir = Path.Combine(_baseDataDirectory, clientId.Replace(":", "-"), "logs", $"job_{jobId}");
+            if (!Directory.Exists(clientDir)) Directory.CreateDirectory(clientDir);
 
-            lock (_lockObj)
+            try
             {
-                if (!Directory.Exists(logDirectory))
-                {
-                    Directory.CreateDirectory(logDirectory);
-                }
+                var entry = JsonSerializer.Deserialize<ClientLogEntry>(jsonEntry);
+                if (entry == null) return;
 
-                try
-                {
-                    var newLog = JsonSerializer.Deserialize<ClientLogEntry>(jsonPayload);
-                    if (newLog == null) return;
-
-                    if (format.Equals("xml", StringComparison.OrdinalIgnoreCase))
-                    {
-                        WriteXmlClientLog(newLog, logDirectory);
-                    }
-                    else
-                    {
-                        WriteJsonClientLog(newLog, logDirectory);
-                    }
-                }
-                catch (Exception) { }
+                if (format.ToLower() == "xml")
+                    WriteXmlClientLog(entry, clientDir);
+                else
+                    WriteJsonClientLog(entry, clientDir);
             }
-
+            catch { }
             await Task.CompletedTask;
         }
 
         private void WriteJsonClientLog(ClientLogEntry entry, string logDirectory)
         {
             string filePath = Path.Combine(logDirectory, $"{DateTime.Now:yyyy-MM-dd}.json");
-            List<ClientLogEntry> logs = new List<ClientLogEntry>();
-
-            if (File.Exists(filePath))
+            lock (_lockObj)
             {
-                try { logs = JsonSerializer.Deserialize<List<ClientLogEntry>>(File.ReadAllText(filePath)) ?? new List<ClientLogEntry>(); }
-                catch (JsonException) { }
+                List<ClientLogEntry> logs = new List<ClientLogEntry>();
+                if (File.Exists(filePath))
+                {
+                    try { logs = JsonSerializer.Deserialize<List<ClientLogEntry>>(File.ReadAllText(filePath)) ?? new List<ClientLogEntry>(); }
+                    catch { }
+                }
+                logs.Add(entry);
+                File.WriteAllText(filePath, JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true }));
             }
-
-            logs.Add(entry);
-            File.WriteAllText(filePath, JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true }));
         }
 
         private void WriteXmlClientLog(ClientLogEntry entry, string logDirectory)
         {
             string filePath = Path.Combine(logDirectory, $"{DateTime.Now:yyyy-MM-dd}.xml");
-            List<ClientLogEntry> logs = new List<ClientLogEntry>();
-            XmlSerializer serializer = new XmlSerializer(typeof(List<ClientLogEntry>));
-
-            if (File.Exists(filePath))
+            lock (_lockObj)
             {
-                try
-                {
-                    using (FileStream fs = new FileStream(filePath, FileMode.Open)) { logs = (List<ClientLogEntry>)serializer.Deserialize(fs); }
-                }
-                catch (InvalidOperationException) { }
-            }
+                List<ClientLogEntry> logs = new List<ClientLogEntry>();
+                XmlSerializer serializer = new XmlSerializer(typeof(List<ClientLogEntry>));
 
-            logs.Add(entry);
-            using (FileStream fs = new FileStream(filePath, FileMode.Create)) { serializer.Serialize(fs, logs); }
+                if (File.Exists(filePath))
+                {
+                    try
+                    {
+                        using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            logs = (List<ClientLogEntry>)serializer.Deserialize(fs);
+                        }
+                    }
+                    catch { }
+                }
+
+                logs.Add(entry);
+                using (FileStream fs = new FileStream(filePath, FileMode.Create))
+                {
+                    serializer.Serialize(fs, logs);
+                }
+            }
         }
     }
 }

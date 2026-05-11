@@ -14,18 +14,13 @@ namespace EasySave.ViewModels
         private readonly NetworkService _networkService;
         private readonly SynchronizationContext _syncContext;
 
-        // Sous-ViewModels spécifiques
         public LanguageService LanguageService { get; }
         public JobManagementViewModel JobVM { get; }
         public SettingsViewModel SettingsVM { get; }
         public NetworkViewModel NetworkVM { get; }
 
         private bool _isSettingsOpen = false;
-        public bool IsSettingsOpen
-        {
-            get => _isSettingsOpen;
-            set { _isSettingsOpen = value; OnPropertyChanged(nameof(IsSettingsOpen)); }
-        }
+        public bool IsSettingsOpen { get => _isSettingsOpen; set { _isSettingsOpen = value; OnPropertyChanged(nameof(IsSettingsOpen)); } }
 
         public ICommand ToggleSettingsCommand { get; }
 
@@ -39,28 +34,22 @@ namespace EasySave.ViewModels
 
             LanguageService = new LanguageService();
 
-            // Instanciation des sous-ViewModels spécialisés
             JobVM = new JobManagementViewModel(_configManager, _backupEngine, _networkService, LanguageService, _syncContext);
             SettingsVM = new SettingsViewModel(_configManager, LanguageService, JobVM);
             NetworkVM = new NetworkViewModel(_networkService, _stateTracker, _configManager, LanguageService, _syncContext);
 
+            // RELAIS : On envoie les messages réseau vers la barre d'activité
+            NetworkVM.OnNewRemoteActivity += (msg) => { JobVM.ExternalActivityUpdate(msg); };
+
             ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
 
-            // Relais des événements de log
             EasyLog.DailyLogger.OnLogGenerated += (jobId, format, entry) =>
             {
-                try
-                {
-                    string jsonLog = JsonSerializer.Serialize(entry);
-                    _networkService.SendMessage($"[LOG]|{jobId}|{format}|{jsonLog}");
-                }
+                try { string jsonLog = JsonSerializer.Serialize(entry); _networkService.SendMessage($"[LOG]|{jobId}|{format}|{jsonLog}"); }
                 catch { }
             };
 
-            EasySave.Services.StateTracker.OnStateUpdated += (jsonState) =>
-            {
-                _networkService.SendMessage($"[STATE]|{jsonState}");
-            };
+            EasySave.Services.StateTracker.OnStateUpdated += (jsonState) => { _networkService.SendMessage($"[STATE]|{jsonState}"); };
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

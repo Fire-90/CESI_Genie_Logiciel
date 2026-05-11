@@ -25,17 +25,10 @@ namespace EasyServer
                 try
                 {
                     TcpClient client = await _listener.AcceptTcpClientAsync();
-                    lock (_lock)
-                    {
-                        _clients.Add(client, string.Empty);
-                    }
-
+                    lock (_lock) { _clients.Add(client, string.Empty); }
                     _ = HandleClient(client);
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[ERREUR] Erreur d'acceptation : {ex.Message}");
-                }
+                catch (Exception ex) { Console.WriteLine($"[ERREUR] Erreur d'acceptation : {ex.Message}"); }
             }
         }
 
@@ -44,13 +37,12 @@ namespace EasyServer
             var stream = client.GetStream();
             byte[] buffer = new byte[4096];
             string incompleteData = "";
-
-            string clientId = "En attente d'identification...";
+            string clientId = "Inconnu";
             bool isIdentified = false;
 
             try
             {
-                while (true)
+                while (client.Connected)
                 {
                     int read = await stream.ReadAsync(buffer, 0, buffer.Length);
                     if (read == 0) break;
@@ -64,110 +56,56 @@ namespace EasyServer
                         string msg = incompleteData.Substring(0, newlineIndex).TrimEnd('\r');
                         incompleteData = incompleteData.Substring(newlineIndex + 1);
 
-                        if (!isIdentified)
+                        if (msg.StartsWith("[ID]"))
                         {
-                            if (msg.StartsWith("[IDENTIFY]|"))
-                            {
-                                clientId = msg.Substring(11).Trim();
-                                isIdentified = true;
-
-                                lock (_lock)
-                                {
-                                    _clients[client] = clientId;
-                                }
-
-                                Console.WriteLine($"[CONNEXION] Client identifié : {clientId}");
-
-                                _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry
-                                {
-                                    Action = "CONNEXION",
-                                    Message = "Nouveau client connecté"
-                                }, clientId);
-                            }
+                            clientId = msg.Substring(4).Trim();
+                            lock (_lock) { _clients[client] = clientId; }
+                            isIdentified = true;
+                            Console.WriteLine($"[OK] Client identifié : {clientId}");
+                            await ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry { Action = "CONNEXION", Message = $"Client {clientId} connecté" }, clientId);
+                        }
+                        else if (msg.StartsWith("[STATE]|"))
+                        {
+                            string json = msg.Substring(8);
+                            await ServerStateManager.Instance.WriteClientStateAsync(json, clientId);
+                        }
+                        else if (msg == "[GET_STATES]")
+                        {
+                            List<string> activeIds;
+                            lock (_lock) { activeIds = _clients.Values.Where(v => !string.IsNullOrEmpty(v)).ToList(); }
+                            string allStates = await ServerStateManager.Instance.GetAllClientStatesAsync(clientId, activeIds);
+                            byte[] response = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{allStates}\n");
+                            await stream.WriteAsync(response, 0, response.Length);
+                        }
+                        else if (msg.StartsWith("[LOG]|"))
+                        {
+                            var parts = msg.Split('|');
+                            if (parts.Length >= 4) { await ServerLogger.Instance.WriteClientLogAsync(parts[3], clientId, parts[1], parts[2]); }
                         }
                         else
                         {
-                            if (msg.StartsWith("[LOG]|"))
+                            string broadcastMsg = msg;
+                            if (msg.StartsWith("[START]") || msg.StartsWith("[END]") || msg.StartsWith("[PROGRESS]") || msg.StartsWith("[ERROR]"))
                             {
-                                var parts = msg.Split(new[] { '|' }, 4);
-                                if (parts.Length == 4)
-                                {
-                                    string jobId = parts[1];
-                                    string format = parts[2];
-                                    string jsonPayload = parts[3];
-
-                                    _ = ServerLogger.Instance.WriteClientBackupLogAsync(jsonPayload, clientId, jobId, format);
-                                }
+                                int firstBracketEnd = msg.IndexOf(']');
+                                string tag = msg.Substring(0, firstBracketEnd + 1);
+                                string content = msg.Substring(firstBracketEnd + 1).Trim();
+                                broadcastMsg = $"{tag}|{clientId}|{content}";
                             }
-                            else if (msg.StartsWith("[STATE]|"))
-                            {
-                                var parts = msg.Split(new[] { '|' }, 2);
-                                if (parts.Length == 2)
-                                {
-                                    string jsonPayload = parts[1];
-                                    _ = ServerStateManager.Instance.WriteClientStateAsync(jsonPayload, clientId);
-                                }
-                            }
-                            else if (msg.StartsWith("[GET_STATES]"))
-                            {
-                                List<string> activeClientIds;
-                                lock (_lock)
-                                {
-                                    activeClientIds = _clients.Values.Where(id => !string.IsNullOrEmpty(id)).ToList();
-                                }
-
-                                string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync(clientId, activeClientIds);
-                                byte[] responseData = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
-                                try { await stream.WriteAsync(responseData, 0, responseData.Length); } catch { }
-                            }
-                            else if (msg.StartsWith("[END]"))
-                            {
-                                string jobInfo = msg.Replace("[END]", "").Trim();
-                                Console.WriteLine($"[STATUT] {clientId} a terminé : {jobInfo}");
-
-                                // On inclut l'ID de la machine dans le message de broadcast pour déclencher l'animation du côté des visionneurs
-                                Broadcast($"[END]|{clientId}|{jobInfo}", client);
-                            }
-                            else if (msg.StartsWith("[START]"))
-                            {
-                                Console.WriteLine($"[STATUT] {clientId} a démarré : {msg.Replace("[START]", "").Trim()}");
-                                Broadcast(msg, client);
-                            }
-                            else if (msg.StartsWith("[ERROR]"))
-                            {
-                                Console.WriteLine($"[ERREUR] {clientId} : {msg.Replace("[ERROR]", "").Trim()}");
-                                Broadcast(msg, client);
-                            }
-                            else
-                            {
-                                Broadcast(msg, client);
-                            }
+                            Broadcast(broadcastMsg, client);
                         }
                     }
                 }
             }
-            catch (Exception) { }
+            catch { }
             finally
             {
-                lock (_lock)
-                {
-                    _clients.Remove(client);
-                }
-
+                lock (_lock) { _clients.Remove(client); }
                 if (isIdentified)
                 {
-                    Console.WriteLine($"[DECONNEXION] Le client {clientId} s'est déconnecté.");
-                    _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry
-                    {
-                        Action = "DECONNEXION",
-                        Message = "Fin de la connexion"
-                    }, clientId);
+                    Console.WriteLine($"[INFO] Client {clientId} déconnecté.");
+                    _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry { Action = "DECONNEXION", Message = "Fin de la connexion" }, clientId);
                 }
-                else
-                {
-                    Console.WriteLine("[DECONNEXION] Un client non identifié s'est déconnecté.");
-                }
-
                 client.Close();
             }
         }
@@ -177,12 +115,9 @@ namespace EasyServer
             byte[] data = Encoding.UTF8.GetBytes(msg + "\n");
             lock (_lock)
             {
-                foreach (var c in _clients.Keys)
+                foreach (var kvp in _clients)
                 {
-                    if (c != sender && c.Connected)
-                    {
-                        try { c.GetStream().Write(data, 0, data.Length); } catch { }
-                    }
+                    if (kvp.Key != sender && kvp.Key.Connected) { try { kvp.Key.GetStream().Write(data, 0, data.Length); } catch { } }
                 }
             }
         }

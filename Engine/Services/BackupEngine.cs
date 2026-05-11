@@ -26,6 +26,9 @@ namespace EasySave.Services
         private readonly object _stateLock = new object();
 
         private static int GlobalPriorityFilesCount = 0;
+        private static int PausedPriorityFilesCount = 0;
+        private readonly ConcurrentDictionary<string, int> _priorityFilesRemainingPerJob = new();
+
         private static readonly SemaphoreSlim _cryptoSoftLock = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim _largeFileLock = new SemaphoreSlim(1, 1);
 
@@ -38,11 +41,41 @@ namespace EasySave.Services
             _configManager = configManager;
         }
 
-        public void PauseJob(string jobName) { if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent)) pauseEvent.Reset(); }
-        public void ResumeJob(string jobName) { if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent)) pauseEvent.Set(); }
-        public void StopJob(string jobName) { if (_jobCancellationTokens.TryGetValue(jobName, out var cts)) cts.Cancel(); ResumeJob(jobName); }
+        public void PauseJob(string jobName)
+        {
+            if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent))
+            {
+                if (pauseEvent.WaitOne(0))
+                {
+                    pauseEvent.Reset();
+                    if (_priorityFilesRemainingPerJob.TryGetValue(jobName, out int remaining))
+                        Interlocked.Add(ref PausedPriorityFilesCount, remaining);
+                }
+            }
+        }
 
-        // AJOUT : Permet au ViewModel de savoir si un blocage est en cours
+        public void ResumeJob(string jobName)
+        {
+            if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent))
+            {
+                if (!pauseEvent.WaitOne(0))
+                {
+                    if (_priorityFilesRemainingPerJob.TryGetValue(jobName, out int remaining))
+                        Interlocked.Add(ref PausedPriorityFilesCount, -remaining);
+                    pauseEvent.Set();
+                }
+            }
+        }
+
+        public void StopJob(string jobName)
+        {
+            if (_jobCancellationTokens.TryGetValue(jobName, out var cts))
+            {
+                cts.Cancel();
+                ResumeJob(jobName);
+            }
+        }
+
         public string GetRunningBusinessSoftware()
         {
             var settings = _configManager.LoadSettings();
@@ -70,7 +103,6 @@ namespace EasySave.Services
                     wasSuspendedBySoftware = true;
                     OnJobSuspendedBySoftware?.Invoke(jobName, true, blocking);
                     lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "SUSPENDED"); }
-                    OnActivityMessage?.Invoke($"[SUSPENDED] Business software detected: {blocking}");
                 }
                 await Task.Delay(1000, token);
             }
@@ -99,27 +131,43 @@ namespace EasySave.Services
             var normalFiles = allFiles.Where(f => !priorityExtensions.Contains(Path.GetExtension(f).ToLower())).ToList();
 
             int totalFilesToCopy = allFiles.Length;
-            long totalFilesSize = allFiles.Sum(f => new FileInfo(f).Length);
             int remainingPriorityFiles = priorityFiles.Count;
 
+            _priorityFilesRemainingPerJob[job.Name] = remainingPriorityFiles;
             Interlocked.Add(ref GlobalPriorityFilesCount, remainingPriorityFiles);
 
-            lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "ACTIVE"; s.TotalFilesToCopy = totalFilesToCopy; s.TotalFilesSize = totalFilesSize; s.NbFilesLeftToDo = totalFilesToCopy; s.RemainingFilesSize = totalFilesSize; s.Progression = 0; }); }
+            lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "ACTIVE"; s.TotalFilesToCopy = totalFilesToCopy; s.NbFilesLeftToDo = totalFilesToCopy; s.Progression = 0; }); }
 
             try
             {
+                // SIGNAL DE DÉBUT
+                OnActivityMessage?.Invoke($"{job.Name} : START");
+
                 foreach (string file in priorityFiles)
                 {
                     await CheckAndWaitForBusinessSoftwareAsync(job.Name, cts.Token);
                     pauseEvent.WaitOne();
                     cts.Token.ThrowIfCancellationRequested();
+
                     try { await ProcessSingleFileAsync(file, job, cts.Token); }
-                    finally { Interlocked.Decrement(ref GlobalPriorityFilesCount); remainingPriorityFiles--; }
+                    finally
+                    {
+                        Interlocked.Decrement(ref GlobalPriorityFilesCount);
+                        _priorityFilesRemainingPerJob.AddOrUpdate(job.Name, 0, (k, v) => v - 1);
+                        if (!pauseEvent.WaitOne(0)) Interlocked.Decrement(ref PausedPriorityFilesCount);
+                        remainingPriorityFiles--;
+                    }
+                }
+
+                while (true)
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    if ((GlobalPriorityFilesCount - PausedPriorityFilesCount) <= 0) break;
+                    await Task.Delay(200, cts.Token);
                 }
 
                 foreach (string file in normalFiles)
                 {
-                    while (Interlocked.CompareExchange(ref GlobalPriorityFilesCount, 0, 0) > 0) { cts.Token.ThrowIfCancellationRequested(); await Task.Delay(200); }
                     await CheckAndWaitForBusinessSoftwareAsync(job.Name, cts.Token);
                     pauseEvent.WaitOne();
                     cts.Token.ThrowIfCancellationRequested();
@@ -129,10 +177,19 @@ namespace EasySave.Services
             catch (OperationCanceledException) { throw new Exception("Job stopped manually."); }
             finally
             {
-                if (remainingPriorityFiles > 0) Interlocked.Add(ref GlobalPriorityFilesCount, -remainingPriorityFiles);
+                // SIGNAL DE FIN
+                OnActivityMessage?.Invoke($"{job.Name} : END");
+
+                if (remainingPriorityFiles > 0)
+                {
+                    Interlocked.Add(ref GlobalPriorityFilesCount, -remainingPriorityFiles);
+                    if (!pauseEvent.WaitOne(0)) Interlocked.Add(ref PausedPriorityFilesCount, -remainingPriorityFiles);
+                }
+                _priorityFilesRemainingPerJob.TryRemove(job.Name, out _);
                 _jobCancellationTokens.TryRemove(job.Name, out _);
                 _jobPauseEvents.TryRemove(job.Name, out _);
-                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "END"; s.SourceFilePath = ""; s.TargetFilePath = ""; s.TotalFilesToCopy = 0; s.NbFilesLeftToDo = 0; s.Progression = 0; }); }
+
+                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "END"; s.Progression = 0; }); }
                 OnJobProgress?.Invoke(job.Name, 100);
             }
         }
@@ -147,16 +204,18 @@ namespace EasySave.Services
             string targetFileDir = Path.GetDirectoryName(targetFile);
             if (!Directory.Exists(targetFileDir)) Directory.CreateDirectory(targetFileDir);
 
-            bool shouldCopy = true;
             FileInfo sourceFileInfo = new FileInfo(file);
+            bool shouldCopy = true;
+
             if (job.Type == BackupType.Differential && File.Exists(targetFile))
             {
                 if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
                 {
                     shouldCopy = false;
-                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.RemainingFilesSize -= sourceFileInfo.Length; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression); }); }
+                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression); }); }
                 }
             }
+
             if (shouldCopy) await CopyFileWithLoggingAsync(file, targetFile, job, sourceFileInfo.Length, token);
         }
 
@@ -167,10 +226,8 @@ namespace EasySave.Services
             long timeMs = 0;
             var settings = _configManager.LoadSettings();
             bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>()).Contains(Path.GetExtension(source).ToLower());
-
             long limitInBytes = settings.MaxParallelFileSizeLimit * (settings.MaxParallelFileSizeLimitUnit switch { "Mo" => 1024L * 1024L, "Go" => 1024L * 1024L * 1024L, _ => 1024L });
             bool isLargeFile = fileSize > limitInBytes;
-            bool isBlockedFired = false;
             bool largeFileLockAcquired = false;
 
             try
@@ -180,7 +237,6 @@ namespace EasySave.Services
                     if (await _largeFileLock.WaitAsync(0)) { largeFileLockAcquired = true; }
                     else
                     {
-                        isBlockedFired = true;
                         OnJobBlocked?.Invoke(job.Name, true);
                         lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED"); }
                         while (true)
@@ -195,19 +251,17 @@ namespace EasySave.Services
                     }
                 }
 
-                try
-                {
-                    stopwatch.Start();
-                    if (shouldEncrypt) ExecuteCryptoSoft(source, target, job.Name, settings.EncryptionKey, token);
-                    else { token.ThrowIfCancellationRequested(); File.Copy(source, target, true); }
-                    stopwatch.Stop();
-                    timeMs = stopwatch.ElapsedMilliseconds;
-                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.RemainingFilesSize -= fileSize; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression); }); }
-                    OnProgressUpdate?.Invoke(source, 0);
-                }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { stopwatch.Stop(); timeMs = -1; OnActivityMessage?.Invoke($"❌ Error: {ex.Message}"); }
+                stopwatch.Start();
+                if (shouldEncrypt) ExecuteCryptoSoft(source, target, job.Name, settings.EncryptionKey, token);
+                else { token.ThrowIfCancellationRequested(); File.Copy(source, target, true); }
+                stopwatch.Stop();
+                timeMs = stopwatch.ElapsedMilliseconds;
+
+                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression); }); }
+                OnProgressUpdate?.Invoke(source, 0);
             }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { stopwatch.Stop(); timeMs = -1; OnActivityMessage?.Invoke($"❌ Error: {ex.Message}"); }
             finally { if (largeFileLockAcquired) _largeFileLock.Release(); }
 
             await DailyLogger.Instance.WriteLogAsync(new LogEntry { Name = job.Name, FileSource = source, FileTarget = target, FileSize = fileSize, FileTransferTime = timeMs }, job.Id.ToString(), settings.LogFormat);

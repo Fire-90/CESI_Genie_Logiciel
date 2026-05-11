@@ -17,6 +17,7 @@ namespace EasySave.Services
         private TcpClient _client;
         private readonly ConfigManager _configManager;
         private readonly int _port;
+        private readonly object _sendLock = new object();
 
         public event Action<string> OnMessageReceived;
         public event Action<ConnectionStatus> OnConnectionStatusChanged;
@@ -39,34 +40,37 @@ namespace EasySave.Services
                         if (_client == null || !_client.Connected)
                         {
                             OnConnectionStatusChanged?.Invoke(ConnectionStatus.Connecting);
-
-                            // Chargement dynamique de l'IP et du Nom (permet les modifs à chaud)
                             var settings = _configManager.LoadSettings();
                             string ipAddress = string.IsNullOrWhiteSpace(settings.ServerIP) ? "127.0.0.1" : settings.ServerIP;
-                            string clientName = string.IsNullOrWhiteSpace(settings.ClientName) ? "UnknownClient" : settings.ClientName;
 
                             _client = new TcpClient();
+                            // Désactive l'algorithme de Nagle pour envoyer les petits paquets immédiatement
+                            _client.NoDelay = true;
+
                             await _client.ConnectAsync(ipAddress, _port);
 
-                            // Envoi immédiat de l'identifiant
-                            SendMessage($"[IDENTIFY]|{clientName}");
+                            if (_client.Connected)
+                            {
+                                OnConnectionStatusChanged?.Invoke(ConnectionStatus.Connected);
 
-                            OnConnectionStatusChanged?.Invoke(ConnectionStatus.Connected);
+                                // On envoie l'ID immédiatement après la connexion
+                                SendMessage($"[ID] {settings.ClientName}");
 
-                            _ = ReceiveLoop(_client);
+                                // On lance l'écoute
+                                _ = ListenToServer(_client);
+                            }
                         }
                     }
                     catch
                     {
                         OnConnectionStatusChanged?.Invoke(ConnectionStatus.Disconnected);
                     }
-
-                    await Task.Delay(5000); // Réessaie toutes les 5 secondes
+                    await Task.Delay(5000); // Réessai toutes les 5 secondes
                 }
             });
         }
 
-        private async Task ReceiveLoop(TcpClient client)
+        private async Task ListenToServer(TcpClient client)
         {
             try
             {
@@ -77,7 +81,7 @@ namespace EasySave.Services
                 while (client.Connected)
                 {
                     int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    if (read == 0) break; // Le serveur a coupé la connexion
+                    if (read == 0) break;
 
                     string receivedChunk = Encoding.UTF8.GetString(buffer, 0, read);
                     incompleteData += receivedChunk;
@@ -94,7 +98,6 @@ namespace EasySave.Services
             catch { }
             finally
             {
-                // Si on sort de la boucle de lecture, on est déconnecté
                 OnConnectionStatusChanged?.Invoke(ConnectionStatus.Disconnected);
             }
         }
@@ -103,12 +106,17 @@ namespace EasySave.Services
         {
             if (_client != null && _client.Connected)
             {
-                try
+                lock (_sendLock)
                 {
-                    byte[] data = Encoding.UTF8.GetBytes(message + "\n");
-                    _client.GetStream().Write(data, 0, data.Length);
+                    try
+                    {
+                        var stream = _client.GetStream();
+                        byte[] data = Encoding.UTF8.GetBytes(message + "\n");
+                        stream.Write(data, 0, data.Length);
+                        stream.Flush(); // Force l'envoi immédiat sur le réseau
+                    }
+                    catch { }
                 }
-                catch { }
             }
         }
     }
