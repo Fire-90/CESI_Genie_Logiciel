@@ -33,6 +33,16 @@
             </DataGrid.Resources>
 
             <DataGrid.Columns>
+                <DataGridCheckBoxColumn Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="40">
+                    <DataGridCheckBoxColumn.ElementStyle>
+                        <Style TargetType="CheckBox">
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                        </Style>
+                    </DataGridCheckBoxColumn.ElementStyle>
+                </DataGridCheckBoxColumn>
+
                 <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" IsReadOnly="True"/>
 
                 <DataGridTextColumn Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150">
@@ -66,6 +76,14 @@
                         </DataTemplate>
                     </DataGridTextColumn.HeaderTemplate>
                 </DataGridTextColumn>
+
+                <DataGridTemplateColumn Header="Progression" Width="120">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="15" Margin="5,0" Foreground="#2ECC71"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

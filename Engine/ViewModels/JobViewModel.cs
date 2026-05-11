@@ -61,11 +61,7 @@ namespace EasySave.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected void OnPropertyChanged(string propertyName) =>
-          PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-
+        // Multithreading UI properties
         private bool _isSelected;
         public bool IsSelected
         {
@@ -79,5 +75,9 @@ namespace EasySave.ViewModels
             get => _progress;
             set { _progress = value; OnPropertyChanged(nameof(Progress)); }
         }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged(string propertyName) =>
+          PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

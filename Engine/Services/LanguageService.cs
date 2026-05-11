@@ -44,27 +44,34 @@ namespace EasySave.Services
                 { "LblSource", "Source Directory" },
                 { "LblTarget", "Target Directory" },
                 { "LblType", "Backup Type" },
-                { "BtnAdd", "+ Add Job" },
-                { "BtnRun", "▶ Run Selection" },
+                { "BtnAdd", "+ Add" },
+                { "BtnRun", "▶ Run" },
                 { "BtnDelete", "🗑 Delete" },
                 { "Settings", "⚙ Settings" },
                 { "Close", "Close" },
-                { "SaveSettings", "Save Configuration" },
+                { "SaveSettings", "Save" },
                 { "Softwares", "Business Softwares:" },
                 { "LblLogFormat", "Log Format:" },
-                { "LblLogDestination", "Logs Destination:" },
-                { "LblEncryptedExt", "Encrypted Extensions:" },
+                { "LblLogDestination", "Log Destination:" },
+                { "LblEncryptedExt", "Encryption Extensions:" },
+                { "LblPriorityExt", "Priority Extensions:" },
                 { "LblServerIP", "Server IP:" },
-                { "Recent", "Recent activity:" },
-                { "ProcessListTitle", "Active Processes List" },
+                { "Recent", "Recent Activity:" },
+                { "ProcessListTitle", "Active Processes" },
                 { "BtnStopProcess", "Stop Process" },
-                { "MsgEmptyPath", "❌ Error: The Source or Target folder is empty." },
+                { "MsgEmptyPath", "❌ Error: Source or Target directory is empty." },
                 { "MsgSlotAdded", "✅ New empty job added." },
-                { "MsgDeleted", "🗑️ Job successfully deleted." }
+                { "MsgDeleted", "🗑️ Job deleted successfully." },
+                
+                // New centralized messages
+                { "MsgStartGlobal", "⏳ Starting background backups..." },
+                { "MsgSuccessGlobal", "✅ All selected backups completed successfully!" },
+                { "MsgError", "❌ Error:" },
+                { "MsgBlockingSoftware", "❌ Backup paused/interrupted. Blocking software running:" }
             }},
             { "FR", new Dictionary<string, string> {
                 { "Title", "EasySave 2.0" },
-                { "TabJobs", "Gestion des Jobs" },
+                { "TabJobs", "Gestion des Travaux" },
                 { "TabProcesses", "Processus" },
                 { "TabSettings", "Paramètres" },
                 { "LblName", "Nom du travail" },
@@ -81,13 +88,20 @@ namespace EasySave.Services
                 { "LblLogFormat", "Format des logs :" },
                 { "LblLogDestination", "Destination des logs :" },
                 { "LblEncryptedExt", "Extensions à chiffrer :" },
+                { "LblPriorityExt", "Extensions prioritaires :" },
                 { "LblServerIP", "IP du serveur :" },
                 { "Recent", "Activité récente :" },
                 { "ProcessListTitle", "Liste des processus actifs" },
                 { "BtnStopProcess", "Arrêter le processus" },
                 { "MsgEmptyPath", "❌ Erreur : Le dossier Source ou Cible est vide." },
                 { "MsgSlotAdded", "✅ Nouveau travail vide ajouté." },
-                { "MsgDeleted", "🗑️ Travail supprimé avec succès." }
+                { "MsgDeleted", "🗑️ Travail supprimé avec succès." },
+
+                // Nouveaux messages centralisés
+                { "MsgStartGlobal", "⏳ Démarrage des sauvegardes en arrière-plan..." },
+                { "MsgSuccessGlobal", "✅ Toutes les sauvegardes sélectionnées sont terminées !" },
+                { "MsgError", "❌ Erreur :" },
+                { "MsgBlockingSoftware", "❌ Sauvegarde interrompue ! Logiciel métier détecté :" }
             }}
         };
 

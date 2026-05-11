@@ -97,6 +97,5 @@ namespace EasySave.Services
         // Defines priority file extensions
         public List<string> PriorityExtensions { get; set; } = new List<string> { ".xml", ".txt" };
 
-        public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
     }
 }
