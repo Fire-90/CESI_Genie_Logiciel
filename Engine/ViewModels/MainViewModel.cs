@@ -147,7 +147,7 @@ namespace EasySave.ViewModels
                     var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim()).ToList();
                     CurrentSettings.PriorityExtensions = extensions;
                     OnPropertyChanged(nameof(PriorityExtensionsString));
-                    SaveConfig(); // CORRECTIF : Maintenant enregistré automatiquement
+                    SaveConfig();
                 }
             }
         }
@@ -202,6 +202,11 @@ namespace EasySave.ViewModels
         public ICommand RefreshProcessesCommand { get; }
         public ICommand ToggleSettingsCommand { get; }
 
+        // Commandes de contrôle d'exécution
+        public ICommand PauseJobCommand { get; }
+        public ICommand ResumeJobCommand { get; }
+        public ICommand StopJobCommand { get; }
+
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
         {
             _configManager = configManager;
@@ -255,6 +260,10 @@ namespace EasySave.ViewModels
             AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
             RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
+
+            PauseJobCommand = new RelayCommand(ExecutePauseJob);
+            ResumeJobCommand = new RelayCommand(ExecuteResumeJob);
+            StopJobCommand = new RelayCommand(ExecuteStopJob);
 
             this.LanguageService.CurrentLanguage = CurrentSettings.Language;
 
@@ -491,6 +500,10 @@ namespace EasySave.ViewModels
 
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
+
+                    var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
+                    propertyInfo?.SetValue(jobVm, false);
+
                     _networkService.SendMessage($"[START] {jobVm.Name}");
 
                     tasks.Add(Task.Run(async () =>
@@ -528,6 +541,10 @@ namespace EasySave.ViewModels
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
                     jobVm.IsRunning = true;
+
+                    var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
+                    propertyInfo?.SetValue(jobVm, false);
+
                     _networkService.SendMessage($"[START] {jobVm.Name}");
                     try
                     {
@@ -545,6 +562,40 @@ namespace EasySave.ViewModels
             catch (Exception ex)
             {
                 CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
+            }
+        }
+
+        private void ExecutePauseJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.PauseJob(job.Name);
+
+                var propertyInfo = job.GetType().GetProperty("IsPaused");
+                propertyInfo?.SetValue(job, true);
+            }
+        }
+
+        private void ExecuteResumeJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.ResumeJob(job.Name);
+
+                var propertyInfo = job.GetType().GetProperty("IsPaused");
+                propertyInfo?.SetValue(job, false);
+            }
+        }
+
+        private void ExecuteStopJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.StopJob(job.Name);
+                job.IsRunning = false;
+
+                var propertyInfo = job.GetType().GetProperty("IsPaused");
+                propertyInfo?.SetValue(job, false);
             }
         }
 
