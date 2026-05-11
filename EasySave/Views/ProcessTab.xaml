@@ -4,26 +4,70 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d">
-    <Grid Margin="20">
+
+    <Grid Margin="15">
         <Grid.RowDefinitions>
+            <RowDefinition Height="1*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Liste des processus actifs" FontSize="24" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+        <GroupBox Header="Processus Locaux" Grid.Row="0" Margin="0,0,0,10" Padding="10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
 
-        <ListBox Grid.Row="1" ItemsSource="{Binding Processes}" SelectedItem="{Binding SelectedProcess}"
-                 BorderBrush="#BDC3C7" BorderThickness="1" Background="White">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding Name}" Padding="10" FontSize="14"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+                <ListBox Grid.Column="0" ItemsSource="{Binding Processes}" SelectedItem="{Binding SelectedProcess}" Margin="0,0,10,0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <Run Text="[" Foreground="Gray"/>
+                                <Run Text="{Binding Id}" FontWeight="Bold"/>
+                                <Run Text="] " Foreground="Gray"/>
+                                <Run Text="{Binding Name}"/>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
-        <Button Grid.Row="2" Content="Arreter le processus" Command="{Binding StopProcessCommand}" 
-                HorizontalAlignment="Right" Margin="0,20,0,0" Padding="20,10" 
-                Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+                <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                    <Button Content="Actualiser" Command="{Binding RefreshProcessesCommand}" Padding="10,5" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Margin="0,0,0,10"/>
+                    <Button Content="Arreter" Command="{Binding StopProcessCommand}" Padding="10,5" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+
+        <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="#BDC3C7" Margin="0,5"/>
+
+        <GroupBox Header="Suivi des autres utilisateurs (Remote States)" Grid.Row="2" Margin="0,10,0,0" Padding="10">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding RemoteStates}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Expander Header="{Binding ClientId}" IsExpanded="True" Margin="0,0,0,15" Background="#F8F9FA">
+                                <DataGrid ItemsSource="{Binding Jobs}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10" HeadersVisibility="Column" Background="White" RowBackground="White" AlternatingRowBackground="#F2F2F2">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Travail" Binding="{Binding Name}" Width="100"/>
+                                        <DataGridTextColumn Header="Etat" Binding="{Binding State}" Width="80"/>
+                                        <DataGridTextColumn Header="Progression" Binding="{Binding Progression, StringFormat={}{0:F0}%}" Width="100"/>
+                                        <DataGridTextColumn Header="Fichiers (Restants/Total)" Width="150">
+                                            <DataGridTextColumn.Binding>
+                                                <MultiBinding StringFormat="{}{0} / {1}">
+                                                    <Binding Path="NbFilesLeftToDo" />
+                                                    <Binding Path="TotalFilesToCopy" />
+                                                </MultiBinding>
+                                            </DataGridTextColumn.Binding>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="Derniere Action" Binding="{Binding LastActionDate}" Width="150"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </GroupBox>
     </Grid>
 </UserControl>

@@ -15,15 +15,12 @@ namespace EasySave.Services
                 if (_currentLanguage != value)
                 {
                     _currentLanguage = value;
-                    // Notifie l'interface WPF que TOUTES les valeurs liées à l'indexeur ont changé
                     OnPropertyChanged("Item[]");
-                    // Force WPF à réévaluer absolument toutes les propriétés de cet objet
                     OnPropertyChanged(null);
                 }
             }
         }
 
-        // L'indexeur permet au XAML de faire {Binding UIStrings[MaCle]}
         public string this[string key]
         {
             get
@@ -32,7 +29,7 @@ namespace EasySave.Services
                 {
                     return Translations[_currentLanguage][key];
                 }
-                return key; // Retourne la clé elle-même si la traduction manque
+                return key;
             }
         }
 
@@ -50,14 +47,20 @@ namespace EasySave.Services
                 { "BtnAdd", "+ Add Job" },
                 { "BtnRun", "▶ Run Selection" },
                 { "BtnDelete", "🗑 Delete" },
+                { "Settings", "⚙ Settings" },
+                { "Close", "Close" },
                 { "SaveSettings", "Save Configuration" },
                 { "Softwares", "Business Softwares:" },
                 { "LblLogFormat", "Log Format:" },
+                { "LblLogDestination", "Logs Destination:" },
                 { "LblEncryptedExt", "Encrypted Extensions:" },
+                { "LblServerIP", "Server IP:" },
                 { "Recent", "Recent activity:" },
-                // Ajouts pour l'onglet des processus
                 { "ProcessListTitle", "Active Processes List" },
-                { "BtnStopProcess", "Stop Process" }
+                { "BtnStopProcess", "Stop Process" },
+                { "MsgEmptyPath", "❌ Error: The Source or Target folder is empty." },
+                { "MsgSlotAdded", "✅ New empty job added." },
+                { "MsgDeleted", "🗑️ Job successfully deleted." }
             }},
             { "FR", new Dictionary<string, string> {
                 { "Title", "EasySave 2.0" },
@@ -71,13 +74,20 @@ namespace EasySave.Services
                 { "BtnAdd", "+ Ajouter" },
                 { "BtnRun", "▶ Lancer" },
                 { "BtnDelete", "🗑 Supprimer" },
+                { "Settings", "⚙ Paramètres" },
+                { "Close", "Fermer" },
                 { "SaveSettings", "Enregistrer" },
                 { "Softwares", "Logiciels métiers :" },
                 { "LblLogFormat", "Format des logs :" },
+                { "LblLogDestination", "Destination des logs :" },
                 { "LblEncryptedExt", "Extensions à chiffrer :" },
+                { "LblServerIP", "IP du serveur :" },
                 { "Recent", "Activité récente :" },
                 { "ProcessListTitle", "Liste des processus actifs" },
-                { "BtnStopProcess", "Arrêter le processus" }
+                { "BtnStopProcess", "Arrêter le processus" },
+                { "MsgEmptyPath", "❌ Erreur : Le dossier Source ou Cible est vide." },
+                { "MsgSlotAdded", "✅ Nouveau travail vide ajouté." },
+                { "MsgDeleted", "🗑️ Travail supprimé avec succès." }
             }}
         };
 

@@ -96,6 +96,12 @@ namespace EasyServer
                                 _ = ServerStateManager.Instance.WriteClientStateAsync(jsonPayload, clientId);
                             }
                         }
+                        else if (msg.StartsWith("[GET_STATES]"))
+                        {
+                            string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync();
+                            byte[] responseData = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
+                            try { await stream.WriteAsync(responseData, 0, responseData.Length); } catch { }
+                        }
                         else
                         {
                             Console.WriteLine($"[RECEPTION] [{clientId}] {msg}");

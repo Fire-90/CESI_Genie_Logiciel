@@ -87,6 +87,7 @@ namespace EasySave.Services
     {
         public string Language { get; set; } = "FR";
         public string LogFormat { get; set; } = "json";
+        public string LogDestination { get; set; } = "LocalAndServer"; // LocalOnly, ServerOnly, LocalAndServer
         public string ServerIP { get; set; } = "127.0.0.1";
         public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
 

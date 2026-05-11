@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -47,6 +48,32 @@ namespace EasyServer
             }
 
             await Task.CompletedTask;
+        }
+
+        public async Task<string> GetAllClientStatesAsync()
+        {
+            var states = new Dictionary<string, object>();
+
+            if (Directory.Exists(_baseDataDirectory))
+            {
+                foreach (var dir in Directory.GetDirectories(_baseDataDirectory))
+                {
+                    string clientId = Path.GetFileName(dir);
+                    string statePath = Path.Combine(dir, "state.json");
+
+                    if (File.Exists(statePath))
+                    {
+                        try
+                        {
+                            string json = await File.ReadAllTextAsync(statePath);
+                            states[clientId] = JsonDocument.Parse(json).RootElement;
+                        }
+                        catch { }
+                    }
+                }
+            }
+
+            return JsonSerializer.Serialize(states);
         }
     }
 }

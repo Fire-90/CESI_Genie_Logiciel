@@ -11,6 +11,8 @@ namespace EasySave.Services
         private readonly string _ipAddress;
         private readonly int _port;
 
+        public event Action<string> OnMessageReceived;
+
         public NetworkService(ConfigManager configManager, int port = 11000)
         {
             var settings = configManager.LoadSettings();
@@ -32,6 +34,9 @@ namespace EasySave.Services
                             _client = new TcpClient();
                             await _client.ConnectAsync(_ipAddress, _port);
                             SendMessage("[CONNEXION] Client EasySave connecté.");
+
+                            // Lancement de l'écoute des messages dès que la connexion est établie
+                            _ = ReceiveLoop(_client);
                         }
                     }
                     catch { }
@@ -41,13 +46,40 @@ namespace EasySave.Services
             });
         }
 
+        private async Task ReceiveLoop(TcpClient client)
+        {
+            try
+            {
+                var stream = client.GetStream();
+                byte[] buffer = new byte[4096];
+                string incompleteData = "";
+
+                while (client.Connected)
+                {
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    if (read == 0) break;
+
+                    string receivedChunk = Encoding.UTF8.GetString(buffer, 0, read);
+                    incompleteData += receivedChunk;
+
+                    int newlineIndex;
+                    while ((newlineIndex = incompleteData.IndexOf('\n')) >= 0)
+                    {
+                        string msg = incompleteData.Substring(0, newlineIndex).TrimEnd('\r');
+                        incompleteData = incompleteData.Substring(newlineIndex + 1);
+                        OnMessageReceived?.Invoke(msg);
+                    }
+                }
+            }
+            catch { }
+        }
+
         public void SendMessage(string message)
         {
             if (_client != null && _client.Connected)
             {
                 try
                 {
-                    // Ajout du \n pour assurer la bonne réception des logs volumineux
                     byte[] data = Encoding.UTF8.GetBytes(message + "\n");
                     _client.GetStream().Write(data, 0, data.Length);
                 }
