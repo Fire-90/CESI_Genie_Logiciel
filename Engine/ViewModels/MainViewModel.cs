@@ -266,7 +266,7 @@ namespace EasySave.ViewModels
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
             RemoteStates = new ObservableCollection<RemoteClientState>();
 
-            // Événements Backup
+            // Événements Backup classiques
             _backupEngine.OnProgressUpdate += (file, remaining) =>
             {
                 if (_uiContext != null)
@@ -277,8 +277,17 @@ namespace EasySave.ViewModels
                 {
                     CurrentFile = file;
                 }
-
                 _networkService.SendMessage($"[PROGRESS] {file}");
+            };
+
+            // Événement prioritaire écrasant le champ Activité Récente (Erreurs & Blocages Limite)
+            _backupEngine.OnActivityMessage += (message) =>
+            {
+                Action updateMsg = () => CurrentFile = message;
+                if (_uiContext != null) _uiContext.Post(_ => updateMsg(), null);
+                else updateMsg();
+
+                _networkService.SendMessage($"[PROGRESS] {message}");
             };
 
             _backupEngine.OnJobWaiting += (jobName, isWaiting) =>
@@ -645,7 +654,7 @@ namespace EasySave.ViewModels
                     }));
                 }
                 await Task.WhenAll(tasks);
-                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped"))
+                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped") && !CurrentFile.Contains("[BLOQUÉ]"))
                 {
                     CurrentFile = this.LanguageService["MsgSuccessGlobal"];
                 }
@@ -711,7 +720,7 @@ namespace EasySave.ViewModels
                     }
                 }
 
-                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped"))
+                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped") && !CurrentFile.Contains("[BLOQUÉ]"))
                 {
                     CurrentFile = this.LanguageService["MsgSuccessGlobal"];
                 }

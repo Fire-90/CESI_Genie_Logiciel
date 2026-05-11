@@ -18,6 +18,7 @@ namespace EasySave.Services
         public event Action<string, int> OnJobProgress;
         public event Action<string, bool> OnJobWaiting;
         public event Action<string, bool> OnJobBlocked;
+        public event Action<string> OnActivityMessage; // Événement pour forcer l'affichage dans Activité Récente
 
         private readonly StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
@@ -61,7 +62,6 @@ namespace EasySave.Services
             foreach (string software in settings.BusinessSoftwares)
             {
                 if (string.IsNullOrWhiteSpace(software)) continue;
-
                 Process[] processes = Process.GetProcessesByName(software);
                 if (processes.Length > 0) return software;
             }
@@ -151,11 +151,7 @@ namespace EasySave.Services
             }
             finally
             {
-                // Libère la barrière au cas où un fichier a causé un crash 
-                if (remainingPriorityFiles > 0)
-                {
-                    Interlocked.Add(ref GlobalPriorityFilesCount, -remainingPriorityFiles);
-                }
+                if (remainingPriorityFiles > 0) Interlocked.Add(ref GlobalPriorityFilesCount, -remainingPriorityFiles);
 
                 _jobCancellationTokens.TryRemove(job.Name, out _);
                 _jobPauseEvents.TryRemove(job.Name, out _);
@@ -233,8 +229,7 @@ namespace EasySave.Services
             long timeMs = 0;
 
             var settings = _configManager.LoadSettings();
-            bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>())
-                                 .Contains(Path.GetExtension(source).ToLower());
+            bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>()).Contains(Path.GetExtension(source).ToLower());
 
             long limitValue = settings.MaxParallelFileSizeLimit;
             long multiplier = settings.MaxParallelFileSizeLimitUnit switch
@@ -252,8 +247,7 @@ namespace EasySave.Services
             {
                 if (isLargeFile)
                 {
-                    // Tente de récupérer le verrou immédiatement
-                    bool acquired = await _largeFileLock.WaitAsync(0);
+                    bool acquired = await _largeFileLock.WaitAsync(0); // Teste instantanément
                     if (!acquired)
                     {
                         isBlockedFired = true;
@@ -263,7 +257,16 @@ namespace EasySave.Services
                             _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED");
                         }
 
-                        // Patiente pour de vrai
+                        // ÉMISSION DU MESSAGE ÉCRASANT L'ACTIVITÉ RÉCENTE
+                        long excessBytes = fileSize - limitInBytes;
+                        string excessStr = excessBytes >= 1024 * 1024 ? (excessBytes / (1024 * 1024)) + " Mo" : (excessBytes / 1024) + " Ko";
+                        string msg = settings.Language == "FR"
+                            ? $"[BLOQUÉ] {Path.GetFileName(source)} dépasse la limite de {excessStr}"
+                            : $"[BLOCKED] {Path.GetFileName(source)} exceeds limit by {excessStr}";
+
+                        OnActivityMessage?.Invoke(msg);
+
+                        // Attente réelle
                         await _largeFileLock.WaitAsync();
 
                         OnJobBlocked?.Invoke(job.Name, false);
@@ -299,10 +302,13 @@ namespace EasySave.Services
                     OnJobProgress?.Invoke(job.Name, currentProgress);
                     OnProgressUpdate?.Invoke(source, 0);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    // DETECTION D'ECHEC (Ex: Fichier trop lourd pour CryptoSoft)
                     stopwatch.Stop();
                     timeMs = -1;
+                    string errMsg = settings.Language == "FR" ? $"❌ Échec copie {Path.GetFileName(source)} : {ex.Message}" : $"❌ Copy failed {Path.GetFileName(source)} : {ex.Message}";
+                    OnActivityMessage?.Invoke(errMsg);
                 }
             }
             finally
@@ -329,8 +335,8 @@ namespace EasySave.Services
             if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe missing.");
 
             bool isWaitingFired = false;
-
             bool acquired = _cryptoSoftLock.Wait(0);
+
             if (!acquired)
             {
                 isWaitingFired = true;
@@ -339,7 +345,6 @@ namespace EasySave.Services
                 {
                     _stateTracker.UpdateState(job.Name, s => s.State = "WAITING");
                 }
-
                 _cryptoSoftLock.Wait();
 
                 OnJobWaiting?.Invoke(job.Name, false);
@@ -352,7 +357,6 @@ namespace EasySave.Services
             try
             {
                 string safeKey = string.IsNullOrWhiteSpace(encryptionKey) ? "EasySaveKey" : encryptionKey;
-
                 ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\" \"{safeKey}\"")
                 {
                     CreateNoWindow = true,
