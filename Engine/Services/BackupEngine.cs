@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using EasySave.Models;
 using EasyLog;
@@ -17,6 +19,9 @@ namespace EasySave.Services
         private StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
+
+        // GLOBAL COUNTER: Shared across ALL running BackupEngine instances (The "Barrier" concept)
+        private static int GlobalPriorityFilesCount = 0;
 
         public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
         {
@@ -54,15 +59,33 @@ namespace EasySave.Services
                 throw new DirectoryNotFoundException($"Source invalide ou introuvable pour {job.Name}");
             }
 
-            int totalFilesToCopy = 0;
-            long totalFilesSize = 0;
-
+            // 1. Gather all files and Settings
             string[] allFiles = Directory.GetFiles(job.SourceDirectory, "*.*", SearchOption.AllDirectories);
+            var settings = _configManager.LoadSettings();
+            List<string> priorityExtensions = settings.PriorityExtensions ?? new List<string>();
+
+            // 2. Sort files into Priority and Normal lists
+            var priorityFiles = new List<string>();
+            var normalFiles = new List<string>();
+
             foreach (string file in allFiles)
             {
-                totalFilesToCopy++;
-                totalFilesSize += new FileInfo(file).Length;
+                string extension = Path.GetExtension(file).ToLower();
+                if (priorityExtensions.Contains(extension))
+                {
+                    priorityFiles.Add(file);
+                }
+                else
+                {
+                    normalFiles.Add(file);
+                }
             }
+
+            int totalFilesToCopy = priorityFiles.Count + normalFiles.Count;
+            long totalFilesSize = allFiles.Sum(f => new FileInfo(f).Length);
+
+            // 3. Register priority files in the global barrier counter safely
+            Interlocked.Add(ref GlobalPriorityFilesCount, priorityFiles.Count);
 
             lock (_stateLock)
             {
@@ -77,67 +100,96 @@ namespace EasySave.Services
                 });
             }
 
-            foreach (string file in allFiles)
+            try
             {
-                string currentBlockingSoftware = GetRunningBusinessSoftware();
-                if (currentBlockingSoftware != null)
+                // 4. STEP ONE: Process PRIORITY files first
+                foreach (string file in priorityFiles)
                 {
-                    throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{currentBlockingSoftware}'.");
+                    await ProcessSingleFileAsync(file, job);
+
+                    // Decrease global priority counter safely when a priority file is done
+                    Interlocked.Decrement(ref GlobalPriorityFilesCount);
                 }
 
-                string relativePath = Path.GetRelativePath(job.SourceDirectory, file);
-                string targetFile = Path.Combine(job.TargetDirectory, relativePath);
-
-                string targetFileDir = Path.GetDirectoryName(targetFile);
-                if (!Directory.Exists(targetFileDir))
+                // 5. STEP TWO: Process NORMAL files (The Barrier)
+                foreach (string file in normalFiles)
                 {
-                    Directory.CreateDirectory(targetFileDir);
-                }
-
-                bool shouldCopy = true;
-                FileInfo sourceFileInfo = new FileInfo(file);
-
-                if (job.Type == BackupType.Differential && File.Exists(targetFile))
-                {
-                    if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
+                    // Barrier: Wait until ALL running jobs have finished their priority files
+                    while (Interlocked.CompareExchange(ref GlobalPriorityFilesCount, 0, 0) > 0)
                     {
-                        shouldCopy = false;
-                        int currentProgress = 0;
-
-                        lock (_stateLock)
-                        {
-                            _stateTracker.UpdateState(job.Name, s =>
-                            {
-                                s.NbFilesLeftToDo--;
-                                s.RemainingFilesSize -= sourceFileInfo.Length;
-                                s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
-                                currentProgress = s.Progression;
-                            });
-                        }
-                        OnJobProgress?.Invoke(job.Name, currentProgress);
+                        // Sleep briefly to prevent high CPU usage while waiting
+                        await Task.Delay(200);
                     }
-                }
 
-                if (shouldCopy)
-                {
-                    await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
+                    await ProcessSingleFileAsync(file, job);
                 }
             }
-
-            lock (_stateLock)
+            finally
             {
-                _stateTracker.UpdateState(job.Name, s =>
+                // Failsafe: Ensure state is always reset to END even if an exception occurs
+                lock (_stateLock)
                 {
-                    s.State = "END";
-                    s.SourceFilePath = "";
-                    s.TargetFilePath = "";
-                    s.TotalFilesToCopy = 0;
-                    s.TotalFilesSize = 0;
-                    s.NbFilesLeftToDo = 0;
-                    s.Progression = 0;
-                });
+                    _stateTracker.UpdateState(job.Name, s =>
+                    {
+                        s.State = "END";
+                        s.SourceFilePath = "";
+                        s.TargetFilePath = "";
+                        s.TotalFilesToCopy = 0;
+                        s.TotalFilesSize = 0;
+                        s.NbFilesLeftToDo = 0;
+                        s.Progression = 0;
+                    });
+                }
+                OnJobProgress?.Invoke(job.Name, 100);
             }
-            OnJobProgress?.Invoke(job.Name, 100);
+        }
+
+        // Extracted file processing logic to avoid code duplication
+        private async Task ProcessSingleFileAsync(string file, BackupJob job)
+        {
+            string currentBlockingSoftware = GetRunningBusinessSoftware();
+            if (currentBlockingSoftware != null)
+            {
+                throw new Exception($"Sauvegarde interrompue : Détection du logiciel '{currentBlockingSoftware}'.");
+            }
+
+            string relativePath = Path.GetRelativePath(job.SourceDirectory, file);
+            string targetFile = Path.Combine(job.TargetDirectory, relativePath);
+
+            string targetFileDir = Path.GetDirectoryName(targetFile);
+            if (!Directory.Exists(targetFileDir))
+            {
+                Directory.CreateDirectory(targetFileDir);
+            }
+
+            bool shouldCopy = true;
+            FileInfo sourceFileInfo = new FileInfo(file);
+
+            if (job.Type == BackupType.Differential && File.Exists(targetFile))
+            {
+                if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
+                {
+                    shouldCopy = false;
+                    int currentProgress = 0;
+
+                    lock (_stateLock)
+                    {
+                        _stateTracker.UpdateState(job.Name, s =>
+                        {
+                            s.NbFilesLeftToDo--;
+                            s.RemainingFilesSize -= sourceFileInfo.Length;
+                            s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
+                            currentProgress = s.Progression;
+                        });
+                    }
+                    OnJobProgress?.Invoke(job.Name, currentProgress);
+                }
+            }
+
+            if (shouldCopy)
+            {
+                await CopyFileWithLoggingAsync(file, targetFile, job.Name, sourceFileInfo.Length);
+            }
         }
 
         private async Task CopyFileWithLoggingAsync(string source, string target, string jobName, long fileSize)
