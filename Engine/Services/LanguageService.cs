@@ -36,7 +36,7 @@ namespace EasySave.Services
         private static readonly Dictionary<string, Dictionary<string, string>> Translations = new Dictionary<string, Dictionary<string, string>>
         {
             { "EN", new Dictionary<string, string> {
-                { "Title", "EasySave 2.0" },
+                { "Title", "EasySave 3.0" },
                 { "TabJobs", "Job Management" },
                 { "TabProcesses", "Processes" },
                 { "TabSettings", "Settings" },
@@ -44,6 +44,7 @@ namespace EasySave.Services
                 { "LblSource", "Source Directory" },
                 { "LblTarget", "Target Directory" },
                 { "LblType", "Backup Type" },
+                { "LblStatus", "Status" },
                 { "BtnAdd", "+ Add" },
                 { "BtnRun", "▶ Run" },
                 { "BtnDelete", "🗑 Delete" },
@@ -63,14 +64,38 @@ namespace EasySave.Services
                 { "MsgSlotAdded", "✅ New empty job added." },
                 { "MsgDeleted", "🗑️ Job deleted successfully." },
                 
-                // New centralized messages
+                // Status States
+                { "StateInactive", "INACTIVE" },
+                { "StateActive", "ACTIVE" },
+                { "StateSuspended", "SUSPENDED" },
+                { "StateStopped", "JUST STOPPED" },
+                { "StateFinished", "FINISHED" },
+
+                // Centralized messages
                 { "MsgStartGlobal", "⏳ Starting background backups..." },
                 { "MsgSuccessGlobal", "✅ All selected backups completed successfully!" },
                 { "MsgError", "❌ Error:" },
-                { "MsgBlockingSoftware", "❌ Backup paused/interrupted. Blocking software running:" }
+                { "MsgBlockingSoftware", "❌ Backup paused/interrupted. Blocking software running:" },
+                { "MsgJobStopped", "Job stopped." },
+
+                // Settings & Network
+                { "TitleGeneral", "⚙ General Settings" },
+                { "LblLanguage", "Language" },
+                { "TitleNetwork", "🌐 Network" },
+                { "LblStatusNetwork", "Status:" },
+                { "LblClientName", "Client Name:" },
+                { "TitleSecurity", "🔒 Security" },
+                { "LblExtensionsHelp", "Separate with semicolons (e.g., .txt;.pdf)" },
+                { "TitleSoftwares", "🚫 Business Softwares" },
+                { "ProcessTabTitle", "Other Users Tracking (Server)" },
+                { "ProcessTabEmpty", "No other user connected or no state available." },
+                { "ProcessTabRemaining", " remaining" },
+                { "StatusConnected", "Connected" },
+                { "StatusConnecting", "Connecting..." },
+                { "StatusDisconnected", "Failed / Disconnected" }
             }},
             { "FR", new Dictionary<string, string> {
-                { "Title", "EasySave 2.0" },
+                { "Title", "EasySave 3.0" },
                 { "TabJobs", "Gestion des Travaux" },
                 { "TabProcesses", "Processus" },
                 { "TabSettings", "Paramètres" },
@@ -78,6 +103,7 @@ namespace EasySave.Services
                 { "LblSource", "Dossier Source" },
                 { "LblTarget", "Dossier Cible" },
                 { "LblType", "Type de sauvegarde" },
+                { "LblStatus", "Statut" },
                 { "BtnAdd", "+ Ajouter" },
                 { "BtnRun", "▶ Lancer" },
                 { "BtnDelete", "🗑 Supprimer" },
@@ -97,11 +123,35 @@ namespace EasySave.Services
                 { "MsgSlotAdded", "✅ Nouveau travail vide ajouté." },
                 { "MsgDeleted", "🗑️ Travail supprimé avec succès." },
 
-                // Nouveaux messages centralisés
+                // États des Statuts
+                { "StateInactive", "INACTIF" },
+                { "StateActive", "ACTIF" },
+                { "StateSuspended", "SUSPENDU" },
+                { "StateStopped", "ARRÊTÉ" },
+                { "StateFinished", "TERMINÉ" },
+
+                // Messages centralisés
                 { "MsgStartGlobal", "⏳ Démarrage des sauvegardes en arrière-plan..." },
                 { "MsgSuccessGlobal", "✅ Toutes les sauvegardes sélectionnées sont terminées !" },
                 { "MsgError", "❌ Erreur :" },
-                { "MsgBlockingSoftware", "❌ Sauvegarde interrompue ! Logiciel métier détecté :" }
+                { "MsgBlockingSoftware", "❌ Sauvegarde interrompue ! Logiciel métier détecté :" },
+                { "MsgJobStopped", "Sauvegarde interrompue." },
+
+                // Settings & Network
+                { "TitleGeneral", "⚙ Paramètres Généraux" },
+                { "LblLanguage", "Langue / Language" },
+                { "TitleNetwork", "🌐 Réseau" },
+                { "LblStatusNetwork", "Statut :" },
+                { "LblClientName", "Nom du Client :" },
+                { "TitleSecurity", "🔒 Sécurité" },
+                { "LblExtensionsHelp", "Séparez par des points-virgules (ex: .txt;.pdf)" },
+                { "TitleSoftwares", "🚫 Logiciels Métiers" },
+                { "ProcessTabTitle", "Suivi des autres utilisateurs (Serveur)" },
+                { "ProcessTabEmpty", "Aucun autre utilisateur connecté ou aucun état disponible." },
+                { "ProcessTabRemaining", " restants" },
+                { "StatusConnected", "Connecté" },
+                { "StatusConnecting", "En cours..." },
+                { "StatusDisconnected", "Échec / Déconnecté" }
             }}
         };
 

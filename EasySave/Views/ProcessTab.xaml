@@ -1,87 +1,87 @@
 <UserControl x:Class="Graphic.Views.ProcessTab"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d" Background="Transparent">
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+	<Grid Margin="20">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Suivi des autres utilisateurs (Serveur)" FontSize="22" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+		<TextBlock Grid.Row="0" Text="{Binding LanguageService[ProcessTabTitle]}" FontSize="22" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding RemoteStates}">
+		<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+			<ItemsControl ItemsSource="{Binding RemoteStates}">
 
-                <ItemsControl.Style>
-                    <Style TargetType="ItemsControl">
-                        <Style.Triggers>
-                            <Trigger Property="HasItems" Value="False">
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate>
-                                            <TextBlock Text="Aucun autre utilisateur connecte ou aucun etat disponible." 
+				<ItemsControl.Style>
+					<Style TargetType="ItemsControl">
+						<Style.Triggers>
+							<Trigger Property="HasItems" Value="False">
+								<Setter Property="Template">
+									<Setter.Value>
+										<ControlTemplate>
+											<TextBlock Text="{Binding DataContext.LanguageService[ProcessTabEmpty], RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                        Foreground="#7F8C8D" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,40,0,0"/>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </ItemsControl.Style>
+										</ControlTemplate>
+									</Setter.Value>
+								</Setter>
+							</Trigger>
+						</Style.Triggers>
+					</Style>
+				</ItemsControl.Style>
 
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
-                            </Border.Effect>
+				<ItemsControl.ItemTemplate>
+					<DataTemplate>
+						<Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
+							<Border.Effect>
+								<DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
+							</Border.Effect>
 
-                            <StackPanel>
-                                <TextBlock Text="{Binding ClientId}" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
+							<StackPanel>
+								<TextBlock Text="{Binding ClientId}" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
 
-                                <ItemsControl ItemsSource="{Binding Jobs}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
+								<ItemsControl ItemsSource="{Binding Jobs}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<WrapPanel Orientation="Horizontal"/>
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
 
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="#F8F9FA" CornerRadius="8" Padding="15" Margin="0,0,15,15" BorderBrush="#E0E0E0" BorderThickness="1" Width="150">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="15" Foreground="#34495E" HorizontalAlignment="Center" Margin="0,0,0,5" TextWrapping="Wrap" TextAlignment="Center"/>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate>
+											<Border Background="#F8F9FA" CornerRadius="8" Padding="15" Margin="0,0,15,15" BorderBrush="#E0E0E0" BorderThickness="1" Width="150">
+												<StackPanel>
+													<TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="15" Foreground="#34495E" HorizontalAlignment="Center" Margin="0,0,0,5" TextWrapping="Wrap" TextAlignment="Center"/>
 
-                                                    <TextBlock Text="{Binding State}" Foreground="#7F8C8D" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+													<TextBlock Text="{Binding State}" Foreground="#7F8C8D" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10"/>
 
-                                                    <ProgressBar Value="{Binding Progression}" Maximum="100" Height="6" Margin="0,0,0,8" Foreground="#3498DB" Background="#E0E0E0" BorderThickness="0"/>
+													<ProgressBar Value="{Binding Progression}" Maximum="100" Height="6" Margin="0,0,0,8" Foreground="#3498DB" Background="#E0E0E0" BorderThickness="0"/>
 
-                                                    <TextBlock Foreground="#2C3E50" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5">
-                                                        <Run Text="{Binding Progression, StringFormat={}{0:F0}%}"/>
-                                                    </TextBlock>
+													<TextBlock Foreground="#2C3E50" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5">
+														<Run Text="{Binding Progression, StringFormat={}{0:F0}%}"/>
+													</TextBlock>
 
-                                                    <TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10">
-                                                        <Run Text="{Binding NbFilesLeftToDo}"/>
-                                                        <Run Text=" restants"/>
-                                                    </TextBlock>
+													<TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10">
+														<Run Text="{Binding NbFilesLeftToDo}"/>
+														<Run Text="{Binding DataContext.LanguageService[ProcessTabRemaining], RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+													</TextBlock>
 
-                                                    <TextBlock Foreground="#BDC3C7" FontSize="10" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap">
-                                                        <Run Text="{Binding LastActionDate}"/>
-                                                    </TextBlock>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-    </Grid>
+													<TextBlock Foreground="#BDC3C7" FontSize="10" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap">
+														<Run Text="{Binding LastActionDate}"/>
+													</TextBlock>
+												</StackPanel>
+											</Border>
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+							</StackPanel>
+						</Border>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</ScrollViewer>
+	</Grid>
 </UserControl>

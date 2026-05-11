@@ -170,7 +170,7 @@ namespace EasySave.ViewModels
 
         // --- STATUT DU RÉSEAU ---
         private ConnectionStatus _currentConnectionStatus = ConnectionStatus.Disconnected;
-        private string _connectionStatusText = "Échec / Déconnecté";
+        private string _connectionStatusText;
         public string ConnectionStatusText
         {
             get => _connectionStatusText;
@@ -228,8 +228,42 @@ namespace EasySave.ViewModels
             // Événements Backup
             _backupEngine.OnProgressUpdate += (file, remaining) =>
             {
-                CurrentFile = file;
+                if (_uiContext != null)
+                {
+                    _uiContext.Post(_ => CurrentFile = file, null);
+                }
+                else
+                {
+                    CurrentFile = file;
+                }
+
                 _networkService.SendMessage($"[PROGRESS] {file}");
+            };
+
+            // Événement Progression Globale par Job
+            _backupEngine.OnJobProgress += (jobName, progress) =>
+            {
+                Action updateProgress = () =>
+                {
+                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
+                    if (jobVm != null)
+                    {
+                        jobVm.Progress = progress;
+                        if (progress >= 100)
+                        {
+                            // Délai pour laisser l'utilisateur voir les 100% avant réinitialisation
+                            Task.Run(async () =>
+                            {
+                                await Task.Delay(1500);
+                                if (_uiContext != null) _uiContext.Post(_ => jobVm.Progress = 0, null);
+                                else jobVm.Progress = 0;
+                            });
+                        }
+                    }
+                };
+
+                if (_uiContext != null) _uiContext.Post(_ => updateProgress(), null);
+                else updateProgress();
             };
 
             // Événements Logs & State
@@ -266,6 +300,7 @@ namespace EasySave.ViewModels
             StopJobCommand = new RelayCommand(ExecuteStopJob);
 
             this.LanguageService.CurrentLanguage = CurrentSettings.Language;
+            ConnectionStatusText = LanguageService["StatusDisconnected"];
 
             StartAutoRefresh();
         }
@@ -308,21 +343,19 @@ namespace EasySave.ViewModels
         {
             Action updateUiAction = () =>
             {
-                bool isEn = CurrentSettings.Language == "EN";
-
                 if (_currentConnectionStatus == ConnectionStatus.Connected)
                 {
-                    ConnectionStatusText = isEn ? "Connected" : "Connecté";
+                    ConnectionStatusText = LanguageService["StatusConnected"];
                     ConnectionStatusColor = "#2ECC71";
                 }
                 else if (_currentConnectionStatus == ConnectionStatus.Connecting)
                 {
-                    ConnectionStatusText = isEn ? "Connecting..." : "En cours...";
+                    ConnectionStatusText = LanguageService["StatusConnecting"];
                     ConnectionStatusColor = "#F39C12";
                 }
                 else
                 {
-                    ConnectionStatusText = isEn ? "Failed / Disconnected" : "Échec / Déconnecté";
+                    ConnectionStatusText = LanguageService["StatusDisconnected"];
                     ConnectionStatusColor = "#E74C3C";
                 }
             };
@@ -347,7 +380,7 @@ namespace EasySave.ViewModels
                         var job = clientState?.Jobs.FirstOrDefault(j => j.Name == rJobName);
                         if (job != null)
                         {
-                            job.State = LanguageService.CurrentLanguage == "EN" ? "Finished" : "Save terminée";
+                            job.State = LanguageService["StateFinished"];
                             job.Progression = 100;
                             job.NbFilesLeftToDo = 0;
                             job.LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
@@ -357,7 +390,7 @@ namespace EasySave.ViewModels
                                 await Task.Delay(3000);
                                 Action resetAction = () =>
                                 {
-                                    if (job.State == "Save terminée" || job.State == "Finished")
+                                    if (job.State == "Save terminée" || job.State == "Finished" || job.State == LanguageService["StateFinished"])
                                     {
                                         job.State = "INACTIVE";
                                         job.Progression = 0;
@@ -409,7 +442,7 @@ namespace EasySave.ViewModels
                                             if (existingJob == null) clientState.Jobs.Add(pj);
                                             else
                                             {
-                                                if ((existingJob.State == "Save terminée" || existingJob.State == "Finished") && pj.State == "INACTIVE")
+                                                if ((existingJob.State == "Save terminée" || existingJob.State == "Finished" || existingJob.State == LanguageService["StateFinished"]) && pj.State == "INACTIVE")
                                                     continue;
 
                                                 existingJob.State = pj.State;
@@ -440,7 +473,9 @@ namespace EasySave.ViewModels
 
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected") return;
+            if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" ||
+                e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused") return;
+
             SaveConfig();
         }
 
@@ -502,7 +537,10 @@ namespace EasySave.ViewModels
                     jobVm.IsRunning = true;
 
                     var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
-                    propertyInfo?.SetValue(jobVm, false);
+                    if (propertyInfo != null && propertyInfo.CanWrite)
+                    {
+                        propertyInfo.SetValue(jobVm, false);
+                    }
 
                     _networkService.SendMessage($"[START] {jobVm.Name}");
 
@@ -515,14 +553,35 @@ namespace EasySave.ViewModels
                         }
                         catch (Exception ex)
                         {
-                            _uiContext?.Post(_ => CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}", null);
-                            _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                            if (ex.Message == "Job stopped manually.")
+                            {
+                                if (_uiContext != null) _uiContext.Post(_ => CurrentFile = LanguageService["MsgJobStopped"], null);
+                                _networkService.SendMessage($"[STOPPED] {jobVm.Name}");
+                            }
+                            else
+                            {
+                                if (_uiContext != null) _uiContext.Post(_ => CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}", null);
+                                _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                            }
                         }
-                        finally { jobVm.IsRunning = false; }
+                        finally
+                        {
+                            Action resetAction = () =>
+                            {
+                                jobVm.IsRunning = false;
+                                if (jobVm.Progress < 100) jobVm.Progress = 0;
+                            };
+
+                            if (_uiContext != null) _uiContext.Post(_ => resetAction(), null);
+                            else resetAction();
+                        }
                     }));
                 }
                 await Task.WhenAll(tasks);
-                if (!CurrentFile.Contains("❌")) CurrentFile = this.LanguageService["MsgSuccessGlobal"];
+                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped"))
+                {
+                    CurrentFile = this.LanguageService["MsgSuccessGlobal"];
+                }
             }
             catch (Exception ex)
             {
@@ -540,10 +599,14 @@ namespace EasySave.ViewModels
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
+                    jobVm.Progress = 0;
                     jobVm.IsRunning = true;
 
                     var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
-                    propertyInfo?.SetValue(jobVm, false);
+                    if (propertyInfo != null && propertyInfo.CanWrite)
+                    {
+                        propertyInfo.SetValue(jobVm, false);
+                    }
 
                     _networkService.SendMessage($"[START] {jobVm.Name}");
                     try
@@ -553,11 +616,34 @@ namespace EasySave.ViewModels
                     }
                     catch (Exception ex)
                     {
-                        _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                        if (ex.Message == "Job stopped manually.")
+                        {
+                            if (_uiContext != null) _uiContext.Post(_ => CurrentFile = LanguageService["MsgJobStopped"], null);
+                            _networkService.SendMessage($"[STOPPED] {jobVm.Name}");
+                        }
+                        else
+                        {
+                            if (_uiContext != null) _uiContext.Post(_ => CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}", null);
+                            _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                        }
                     }
-                    finally { jobVm.IsRunning = false; }
+                    finally
+                    {
+                        Action resetAction = () =>
+                        {
+                            jobVm.IsRunning = false;
+                            if (jobVm.Progress < 100) jobVm.Progress = 0;
+                        };
+
+                        if (_uiContext != null) _uiContext.Post(_ => resetAction(), null);
+                        else resetAction();
+                    }
                 }
-                CurrentFile = this.LanguageService["MsgSuccessGlobal"];
+
+                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped"))
+                {
+                    CurrentFile = this.LanguageService["MsgSuccessGlobal"];
+                }
             }
             catch (Exception ex)
             {
@@ -572,7 +658,10 @@ namespace EasySave.ViewModels
                 _backupEngine.PauseJob(job.Name);
 
                 var propertyInfo = job.GetType().GetProperty("IsPaused");
-                propertyInfo?.SetValue(job, true);
+                if (propertyInfo != null && propertyInfo.CanWrite)
+                {
+                    propertyInfo.SetValue(job, true);
+                }
             }
         }
 
@@ -583,7 +672,10 @@ namespace EasySave.ViewModels
                 _backupEngine.ResumeJob(job.Name);
 
                 var propertyInfo = job.GetType().GetProperty("IsPaused");
-                propertyInfo?.SetValue(job, false);
+                if (propertyInfo != null && propertyInfo.CanWrite)
+                {
+                    propertyInfo.SetValue(job, false);
+                }
             }
         }
 
@@ -595,7 +687,10 @@ namespace EasySave.ViewModels
                 job.IsRunning = false;
 
                 var propertyInfo = job.GetType().GetProperty("IsPaused");
-                propertyInfo?.SetValue(job, false);
+                if (propertyInfo != null && propertyInfo.CanWrite)
+                {
+                    propertyInfo.SetValue(job, false);
+                }
             }
         }
 

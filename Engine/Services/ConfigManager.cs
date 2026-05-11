@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using EasySave.Models;
 
 namespace EasySave.Services
@@ -9,6 +10,7 @@ namespace EasySave.Services
     public class ConfigManager
     {
         private readonly string _settingsFilePath;
+        private static readonly object _lockObj = new object();
 
         public ConfigManager()
         {
@@ -20,18 +22,32 @@ namespace EasySave.Services
 
         public AppSettings LoadSettings()
         {
-            if (!File.Exists(_settingsFilePath))
+            lock (_lockObj)
             {
-                return CreateDefaultSettings();
-            }
+                if (!File.Exists(_settingsFilePath))
+                {
+                    return CreateDefaultSettings();
+                }
 
-            try
-            {
-                string json = File.ReadAllText(_settingsFilePath);
-                return JsonSerializer.Deserialize<AppSettings>(json) ?? CreateDefaultSettings();
-            }
-            catch (JsonException)
-            {
+                int maxRetries = 5;
+                for (int i = 0; i < maxRetries; i++)
+                {
+                    try
+                    {
+                        string json = File.ReadAllText(_settingsFilePath);
+                        return JsonSerializer.Deserialize<AppSettings>(json) ?? CreateDefaultSettings();
+                    }
+                    catch (IOException)
+                    {
+                        if (i == maxRetries - 1) throw; // Si on échoue après 5 essais
+                        Thread.Sleep(50);
+                    }
+                    catch (JsonException)
+                    {
+                        return CreateDefaultSettings();
+                    }
+                }
+
                 return CreateDefaultSettings();
             }
         }
@@ -55,27 +71,44 @@ namespace EasySave.Services
 
         public void SaveSettings(AppSettings settings)
         {
-            // Protection contre l'effacement accidentel des travaux (Jobs)
-            if (settings.Jobs == null || settings.Jobs.Count == 0)
+            lock (_lockObj)
             {
-                if (File.Exists(_settingsFilePath))
+                // Protection contre l'effacement accidentel des travaux (Jobs)
+                if (settings.Jobs == null || settings.Jobs.Count == 0)
+                {
+                    if (File.Exists(_settingsFilePath))
+                    {
+                        try
+                        {
+                            string existingJson = File.ReadAllText(_settingsFilePath);
+                            var existingSettings = JsonSerializer.Deserialize<AppSettings>(existingJson);
+                            if (existingSettings != null && existingSettings.Jobs != null && existingSettings.Jobs.Count > 0)
+                            {
+                                settings.Jobs = existingSettings.Jobs;
+                            }
+                        }
+                        catch (JsonException) { }
+                    }
+                }
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                string json = JsonSerializer.Serialize(settings, options);
+
+                int maxRetries = 5;
+                for (int i = 0; i < maxRetries; i++)
                 {
                     try
                     {
-                        string existingJson = File.ReadAllText(_settingsFilePath);
-                        var existingSettings = JsonSerializer.Deserialize<AppSettings>(existingJson);
-                        if (existingSettings != null && existingSettings.Jobs != null && existingSettings.Jobs.Count > 0)
-                        {
-                            settings.Jobs = existingSettings.Jobs;
-                        }
+                        File.WriteAllText(_settingsFilePath, json);
+                        break;
                     }
-                    catch (JsonException) { }
+                    catch (IOException)
+                    {
+                        if (i == maxRetries - 1) throw;
+                        Thread.Sleep(50);
+                    }
                 }
             }
-
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(settings, options);
-            File.WriteAllText(_settingsFilePath, json);
         }
     }
 
