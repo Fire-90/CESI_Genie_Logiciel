@@ -99,14 +99,30 @@ namespace EasySave.Services
             }
         }
 
+        // Nouvelle méthode pour forcer l'envoi de l'état (utile lors de la connexion réseau)
+        public void BroadcastState()
+        {
+            lock (_lockObj)
+            {
+                if (_currentStates != null)
+                {
+                    // JSON compact sur 1 seule ligne pour ne pas casser le lecteur TCP du serveur
+                    string compactJson = JsonSerializer.Serialize(_currentStates);
+                    OnStateUpdated?.Invoke(compactJson);
+                }
+            }
+        }
+
         private void WriteAllStates()
         {
+            // 1. Sauvegarde locale AVEC sauts de ligne (lisible pour l'humain)
             var options = new JsonSerializerOptions { WriteIndented = true };
-            string jsonString = JsonSerializer.Serialize(_currentStates, options);
-            File.WriteAllText(_stateFilePath, jsonString);
+            string indentedJson = JsonSerializer.Serialize(_currentStates, options);
+            File.WriteAllText(_stateFilePath, indentedJson);
 
-            // On avertit le système qu'un nouveau state est disponible pour l'envoi
-            OnStateUpdated?.Invoke(jsonString);
+            // 2. Envoi réseau SANS sauts de ligne (pour que le serveur comprenne le message)
+            string compactJson = JsonSerializer.Serialize(_currentStates);
+            OnStateUpdated?.Invoke(compactJson);
         }
     }
 }

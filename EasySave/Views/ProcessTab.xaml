@@ -11,60 +11,75 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,15">
-            <TextBlock Text="Suivi des autres utilisateurs (Serveur)" FontSize="22" FontWeight="Bold" Foreground="#2C3E50" VerticalAlignment="Center"/>
-            <Button Content="Actualiser les etats" Command="{Binding RefreshProcessesCommand}" Padding="15,8" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand" HorizontalAlignment="Right"/>
-        </Grid>
+        <TextBlock Grid.Row="0" Text="Suivi des autres utilisateurs (Serveur)" FontSize="22" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
 
-        <Border Grid.Row="1" Background="White" CornerRadius="10" Padding="15">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
-            </Border.Effect>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding RemoteStates}">
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding RemoteStates}">
+                <ItemsControl.Style>
+                    <Style TargetType="ItemsControl">
+                        <Style.Triggers>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate>
+                                            <TextBlock Text="Aucun autre utilisateur connecte ou aucun etat disponible." 
+                                                       Foreground="#7F8C8D" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,40,0,0"/>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ItemsControl.Style>
 
-                    <ItemsControl.Style>
-                        <Style TargetType="ItemsControl">
-                            <Style.Triggers>
-                                <Trigger Property="HasItems" Value="False">
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate>
-                                                <TextBlock Text="Aucun autre utilisateur connecte ou aucun etat disponible." 
-                                                           Foreground="#7F8C8D" FontStyle="Italic" HorizontalAlignment="Center" Margin="0,20,0,0"/>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ItemsControl.Style>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
+                            </Border.Effect>
 
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Expander Header="{Binding ClientId}" IsExpanded="True" Margin="0,0,0,15" Background="#F8F9FA" BorderBrush="#BDC3C7" BorderThickness="1">
-                                <DataGrid ItemsSource="{Binding Jobs}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10" HeadersVisibility="Column" Background="White" RowBackground="White" AlternatingRowBackground="#F2F2F2" BorderBrush="#E0E0E0">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Travail" Binding="{Binding Name}" Width="*"/>
-                                        <DataGridTextColumn Header="Etat" Binding="{Binding State}" Width="*"/>
-                                        <DataGridTextColumn Header="Progression" Binding="{Binding Progression, StringFormat={}{0:F0}%}" Width="*"/>
-                                        <DataGridTextColumn Header="Fichiers (Restants/Total)" Width="1.5*">
-                                            <DataGridTextColumn.Binding>
-                                                <MultiBinding StringFormat="{}{0} / {1}">
-                                                    <Binding Path="NbFilesLeftToDo" />
-                                                    <Binding Path="TotalFilesToCopy" />
-                                                </MultiBinding>
-                                            </DataGridTextColumn.Binding>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="Derniere Action" Binding="{Binding LastActionDate}" Width="1.5*"/>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-                            </Expander>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Border>
+                            <StackPanel>
+                                <TextBlock Text="{Binding ClientId}" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
+
+                                <ItemsControl ItemsSource="{Binding Jobs}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#F8F9FA" CornerRadius="8" Padding="15" Margin="0,0,0,10" BorderBrush="#E0E0E0" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" FontWeight="Bold" FontSize="15" Foreground="#34495E"/>
+                                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding State}" Foreground="#7F8C8D" FontWeight="SemiBold" VerticalAlignment="Center"/>
+
+                                                    <ProgressBar Grid.Row="1" Grid.Column="0" Value="{Binding Progression}" Maximum="100" Height="8" Margin="0,12,20,0" Foreground="#2ECC71" Background="#E0E0E0" BorderThickness="0"/>
+
+                                                    <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,10,0,0" Foreground="#7F8C8D" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                        <Run Text="{Binding Progression, StringFormat={}{0:F0}%}" FontWeight="Bold" Foreground="#3498DB"/>
+                                                        <Run Text=" ("/>
+                                                        <Run Text="{Binding NbFilesLeftToDo}"/>
+                                                        <Run Text=" / "/>
+                                                        <Run Text="{Binding TotalFilesToCopy}"/>
+                                                        <Run Text=")"/>
+                                                    </TextBlock>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
     </Grid>
 </UserControl>

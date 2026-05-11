@@ -180,7 +180,7 @@ namespace EasySave.ViewModels
         public ICommand ChangeLanguageCommand { get; }
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
-        public ICommand RefreshProcessesCommand { get; }
+        public ICommand RefreshProcessesCommand { get; } // Réintégré pour le clic sur l'onglet
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
         {
@@ -224,8 +224,6 @@ namespace EasySave.ViewModels
             };
 
             _networkService.OnMessageReceived += HandleNetworkMessage;
-
-            // Écoute du changement d'état réseau
             _networkService.OnConnectionStatusChanged += HandleConnectionStatusChanged;
 
             AddJobCommand = new RelayCommand(ExecuteAddJob);
@@ -234,17 +232,49 @@ namespace EasySave.ViewModels
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
             AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
-            RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
+            RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses); // Initialisation
 
             ChangeLanguage(CurrentSettings.Language);
 
-            ExecuteRefreshProcesses(null);
+            // Démarrage de la boucle de rafraîchissement automatique
+            StartAutoRefresh();
+        }
+
+        private void StartAutoRefresh()
+        {
+            Task.Run(async () =>
+            {
+                while (true)
+                {
+                    // Demande les états distants toutes les 2 secondes si on est connecté
+                    if (_currentConnectionStatus == ConnectionStatus.Connected)
+                    {
+                        _networkService.SendMessage("[GET_STATES]");
+                    }
+                    await Task.Delay(2000);
+                }
+            });
+        }
+
+        private void ExecuteRefreshProcesses(object parameter)
+        {
+            // Déclenché instantanément quand on clique sur l'onglet Processus
+            if (_currentConnectionStatus == ConnectionStatus.Connected)
+            {
+                _networkService.SendMessage("[GET_STATES]");
+            }
         }
 
         private void HandleConnectionStatusChanged(ConnectionStatus status)
         {
             _currentConnectionStatus = status;
             UpdateConnectionStatusUI();
+
+            // DÈS QU'ON EST CONNECTÉ : On force l'envoi de notre état au serveur
+            if (status == ConnectionStatus.Connected)
+            {
+                _stateTracker.BroadcastState();
+            }
         }
 
         private void UpdateConnectionStatusUI()
@@ -332,7 +362,7 @@ namespace EasySave.ViewModels
             CurrentSettings.Language = lang;
             LanguageService.CurrentLanguage = lang;
             SaveConfig();
-            UpdateConnectionStatusUI(); // Met à jour la traduction du statut réseau
+            UpdateConnectionStatusUI();
         }
 
         private void ExecuteAddJob(object parameter)
@@ -434,11 +464,6 @@ namespace EasySave.ViewModels
                 CurrentSettings.BusinessSoftwares = Softwares.ToList();
                 SaveConfig();
             }
-        }
-
-        private void ExecuteRefreshProcesses(object parameter)
-        {
-            _networkService.SendMessage("[GET_STATES]");
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -49,7 +49,7 @@ namespace Graphic
         {
             if (e.Source is TabControl tabControl)
             {
-                // Index 1 correspond à l'onglet "Processus"
+                // L'index 1 correspond à l'onglet "Processus"
                 if (tabControl.SelectedIndex == 1)
                 {
                     _mainViewModel?.RefreshProcessesCommand.Execute(null);
