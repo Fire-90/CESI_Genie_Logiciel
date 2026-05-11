@@ -27,14 +27,16 @@ namespace EasyServer
     [Serializable]
     public class ClientLogEntry
     {
-        public string JobId { get; set; } // Identifiant du travail (Job)
-        public string Name { get; set; }  // Nom du travail
+        public string ClientId { get; set; } // Identifiant du client émetteur
+        public string JobId { get; set; }    // ID du travail
+        public string Name { get; set; }     // Nom du travail
         public string FileSource { get; set; }
         public string FileTarget { get; set; }
         public long FileSize { get; set; }
         public double FileTransferTime { get; set; }
-        public double EncryptionTime { get; set; } // Temps de chiffrement (en ms)
-        public string time { get; set; } // Horodatage fourni par le client
+        public double EncryptionTime { get; set; }
+        [JsonPropertyName("time")]
+        public string Time { get; set; }
     }
 
     public sealed class ServerLogger
@@ -52,7 +54,7 @@ namespace EasyServer
         }
 
         /// <summary>
-        /// Écrit dans le journal de connexion global : data/connection_history.json
+        /// Journal de connexion global : data/connection_history.json
         /// </summary>
         public async Task WriteConnectionLogAsync(ServerLogEntry entry, string clientId)
         {
@@ -64,10 +66,7 @@ namespace EasyServer
                 List<ServerLogEntry> logs = new List<ServerLogEntry>();
                 if (File.Exists(filePath))
                 {
-                    try
-                    {
-                        logs = JsonSerializer.Deserialize<List<ServerLogEntry>>(File.ReadAllText(filePath)) ?? new List<ServerLogEntry>();
-                    }
+                    try { logs = JsonSerializer.Deserialize<List<ServerLogEntry>>(File.ReadAllText(filePath)) ?? new List<ServerLogEntry>(); }
                     catch { }
                 }
                 logs.Add(entry);
@@ -77,8 +76,9 @@ namespace EasyServer
         }
 
         /// <summary>
-        /// Écrit les logs de sauvegarde dans le dossier du client : data/ID/logs/
-        /// Tous les jobs du client sont regroupés dans le fichier du jour.
+        /// Écrit les logs : 
+        /// 1. Dans le dossier client (data/ID/logs/)
+        /// 2. Dans le journal global (data/global_activity_log.json)
         /// </summary>
         public async Task WriteClientLogAsync(string jsonEntry, string clientId, string jobId, string format)
         {
@@ -92,13 +92,17 @@ namespace EasyServer
                 var entry = JsonSerializer.Deserialize<ClientLogEntry>(jsonEntry);
                 if (entry == null) return;
 
-                // On injecte le JobId qui manque souvent dans le JSON brut du client
                 entry.JobId = jobId;
+                entry.ClientId = clientId;
 
+                // 1. Écriture dans le log spécifique du client
                 if (format.ToLower() == "xml")
                     WriteXmlClientLog(entry, clientLogDir);
                 else
                     WriteJsonClientLog(entry, clientLogDir);
+
+                // 2. Écriture dans le grand journal global (toujours en JSON)
+                WriteGlobalActivityLog(entry);
             }
             catch { }
             await Task.CompletedTask;
@@ -107,6 +111,25 @@ namespace EasyServer
         private void WriteJsonClientLog(ClientLogEntry entry, string logDirectory)
         {
             string filePath = Path.Combine(logDirectory, $"{DateTime.Now:yyyy-MM-dd}.json");
+            lock (_lockObj)
+            {
+                List<ClientLogEntry> logs = new List<ClientLogEntry>();
+                if (File.Exists(filePath))
+                {
+                    try { logs = JsonSerializer.Deserialize<List<ClientLogEntry>>(File.ReadAllText(filePath)) ?? new List<ClientLogEntry>(); }
+                    catch { }
+                }
+                logs.Add(entry);
+                File.WriteAllText(filePath, JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true }));
+            }
+        }
+
+        /// <summary>
+        /// Ajoute l'entrée au grand fichier de log général : data/global_activity_log.json
+        /// </summary>
+        private void WriteGlobalActivityLog(ClientLogEntry entry)
+        {
+            string filePath = Path.Combine(_baseDataDirectory, "global_activity_log.json");
             lock (_lockObj)
             {
                 List<ClientLogEntry> logs = new List<ClientLogEntry>();
