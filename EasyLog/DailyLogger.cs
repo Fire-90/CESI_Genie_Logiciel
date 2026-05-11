@@ -112,18 +112,30 @@ namespace EasyLog
             string filePath = Path.Combine(logDirectory, fileName);
             List<LogEntry> logs = new List<LogEntry>();
 
-            int maxRetries = 5;
-            for (int r = 0; r < maxRetries; r++)
+            // On vérifie d'abord si le fichier existe pour éviter le crash (FileNotFoundException)
+            if (File.Exists(filePath))
             {
-                try
+                int maxRetries = 5;
+                for (int r = 0; r < maxRetries; r++)
                 {
-                    string existingJson = File.ReadAllText(filePath);
-                    if (!string.IsNullOrWhiteSpace(existingJson))
+                    try
                     {
-                        logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
+                        string existingJson = File.ReadAllText(filePath);
+                        if (!string.IsNullOrWhiteSpace(existingJson))
+                        {
+                            logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
+                        }
+                        break; // SUCCÈS : on sort de la boucle de tentatives
+                    }
+                    catch (IOException) // Fichier actuellement verrouillé par un autre processus
+                    {
+                        System.Threading.Thread.Sleep(50); // On attend 50ms avant de réessayer
+                    }
+                    catch (JsonException)
+                    {
+                        break; // Fichier corrompu, on arrête de réessayer pour l'écraser
                     }
                 }
-                catch (JsonException) { }
             }
 
             logs.Add(entry);
@@ -138,17 +150,29 @@ namespace EasyLog
             List<LogEntry> logs = new List<LogEntry>();
             XmlSerializer serializer = new XmlSerializer(typeof(List<LogEntry>));
 
-            int maxRetries = 5;
-            for (int r = 0; r < maxRetries; r++)
+            // On vérifie d'abord si le fichier existe pour éviter le crash
+            if (File.Exists(filePath))
             {
-                try
+                int maxRetries = 5;
+                for (int r = 0; r < maxRetries; r++)
                 {
-                    using (FileStream fs = new FileStream(filePath, FileMode.Open))
+                    try
                     {
-                        logs = (List<LogEntry>)serializer.Deserialize(fs);
+                        using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            logs = (List<LogEntry>)serializer.Deserialize(fs);
+                        }
+                        break; // SUCCÈS : on sort de la boucle
+                    }
+                    catch (IOException) // Fichier verrouillé
+                    {
+                        System.Threading.Thread.Sleep(50);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        break; // XML Corrompu, on l'écrase
                     }
                 }
-                catch (InvalidOperationException) { }
             }
 
             logs.Add(entry);
