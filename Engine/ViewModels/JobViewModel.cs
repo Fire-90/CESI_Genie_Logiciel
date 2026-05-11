@@ -6,12 +6,10 @@ namespace EasySave.ViewModels
     public class JobViewModel : INotifyPropertyChanged
     {
         public BackupJob Model { get; }
-
         public JobViewModel(BackupJob model)
         {
             Model = model;
         }
-
         public int Id => Model.Id;
 
         public string Name
@@ -26,7 +24,6 @@ namespace EasySave.ViewModels
                 }
             }
         }
-
         public string SourceDirectory
         {
             get => Model.SourceDirectory;
@@ -39,7 +36,6 @@ namespace EasySave.ViewModels
                 }
             }
         }
-
         public string TargetDirectory
         {
             get => Model.TargetDirectory;
@@ -52,7 +48,6 @@ namespace EasySave.ViewModels
                 }
             }
         }
-
         public BackupType Type
         {
             get => Model.Type;
@@ -66,8 +61,36 @@ namespace EasySave.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        // Multithreading UI properties
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); }
+        }
 
+        private int _progress;
+        public int Progress
+        {
+            get => _progress;
+            set { _progress = value; OnPropertyChanged(nameof(Progress)); }
+        }
+
+        private bool _isRunning;
+        public bool IsRunning
+        {
+            get => _isRunning;
+            set { _isRunning = value; OnPropertyChanged(nameof(IsRunning)); }
+        }
+
+        private bool _isPaused;
+        public bool IsPaused
+        {
+            get => _isPaused;
+            set { _isPaused = value; OnPropertyChanged(nameof(IsPaused)); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) =>
           PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }

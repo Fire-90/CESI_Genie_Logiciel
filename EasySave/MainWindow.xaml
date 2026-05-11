@@ -5,6 +5,7 @@
         Title="{Binding LanguageService[Title]}" Height="650" Width="950" MinHeight="550" MinWidth="850"
         WindowStartupLocation="CenterScreen"
         Background="#F4F6F9">
+
     <Grid>
         <TabControl Background="Transparent" BorderThickness="0" SelectionChanged="TabControl_SelectionChanged">
             <TabItem>

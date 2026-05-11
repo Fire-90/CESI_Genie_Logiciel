@@ -88,5 +88,9 @@ namespace EasySave.Services
         public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
         public List<string> BusinessSoftwares { get; set; } = new List<string> { "calculator", "notepad" };
         public List<string> EncryptedExtensions { get; set; } = new List<string> { ".txt", ".docx" };
+
+        // Defines priority file extensions
+        public List<string> PriorityExtensions { get; set; } = new List<string> { ".xml", ".txt" };
+
     }
 }
