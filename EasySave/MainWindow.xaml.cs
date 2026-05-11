@@ -40,7 +40,8 @@ namespace Graphic
 
                 if (idsToExecute.Count > 0)
                 {
-                    await _mainViewModel.ExecuteJobsAsync(idsToExecute);
+                    // Redirection de l'appel vers le sous-ViewModel gérant les travaux
+                    await _mainViewModel.JobVM.ExecuteJobsAsync(idsToExecute);
                 }
             }
         }
@@ -52,7 +53,8 @@ namespace Graphic
                 // L'index 1 correspond à l'onglet "Processus"
                 if (tabControl.SelectedIndex == 1)
                 {
-                    _mainViewModel?.RefreshProcessesCommand.Execute(null);
+                    // Redirection de l'appel vers le sous-ViewModel gérant le réseau
+                    _mainViewModel?.NetworkVM.RefreshProcessesCommand.Execute(null);
                 }
             }
         }

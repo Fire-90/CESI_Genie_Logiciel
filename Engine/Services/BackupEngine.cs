@@ -18,7 +18,7 @@ namespace EasySave.Services
         public event Action<string, int> OnJobProgress;
         public event Action<string, bool> OnJobWaiting;
         public event Action<string, bool> OnJobBlocked;
-        public event Action<string> OnActivityMessage; // Événement pour forcer l'affichage dans Activité Récente
+        public event Action<string> OnActivityMessage;
 
         private readonly StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
@@ -151,6 +151,7 @@ namespace EasySave.Services
             }
             finally
             {
+                // Nettoyage de la barrière globale en cas d'erreur ou d'annulation
                 if (remainingPriorityFiles > 0) Interlocked.Add(ref GlobalPriorityFilesCount, -remainingPriorityFiles);
 
                 _jobCancellationTokens.TryRemove(job.Name, out _);
@@ -236,44 +237,56 @@ namespace EasySave.Services
             {
                 "Mo" => 1024L * 1024L,
                 "Go" => 1024L * 1024L * 1024L,
-                _ => 1024L // "Ko"
+                _ => 1024L // Par défaut "Ko"
             };
 
             long limitInBytes = limitValue * multiplier;
             bool isLargeFile = fileSize > limitInBytes;
-            bool isBlockedFired = false;
+
+            _jobPauseEvents.TryGetValue(job.Name, out var pauseEvent);
+            _jobCancellationTokens.TryGetValue(job.Name, out var cts);
+            var token = cts?.Token ?? CancellationToken.None;
+
+            bool largeFileLockAcquired = false;
 
             try
             {
                 if (isLargeFile)
                 {
-                    bool acquired = await _largeFileLock.WaitAsync(0); // Teste instantanément
-                    if (!acquired)
+                    // Tente de prendre le verrou sans bloquer le thread (attente 0 ms)
+                    if (await _largeFileLock.WaitAsync(0))
                     {
-                        isBlockedFired = true;
+                        largeFileLockAcquired = true;
+                    }
+                    else
+                    {
+                        // Si le verrou est pris, on signale le blocage à l'UI
                         OnJobBlocked?.Invoke(job.Name, true);
-                        lock (_stateLock)
-                        {
-                            _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED");
-                        }
+                        lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED"); }
 
-                        // ÉMISSION DU MESSAGE ÉCRASANT L'ACTIVITÉ RÉCENTE
                         long excessBytes = fileSize - limitInBytes;
                         string excessStr = excessBytes >= 1024 * 1024 ? (excessBytes / (1024 * 1024)) + " Mo" : (excessBytes / 1024) + " Ko";
                         string msg = settings.Language == "FR"
                             ? $"[BLOQUÉ] {Path.GetFileName(source)} dépasse la limite de {excessStr}"
                             : $"[BLOCKED] {Path.GetFileName(source)} exceeds limit by {excessStr}";
-
                         OnActivityMessage?.Invoke(msg);
 
-                        // Attente réelle
-                        await _largeFileLock.WaitAsync();
+                        // Boucle d'attente qui reste sensible à la PAUSE et à l'ARRET (Stop)
+                        while (true)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            pauseEvent?.WaitOne(); // Si le travail est mis en pause, le thread s'arrête ici sans "voler" le verrou
+                            token.ThrowIfCancellationRequested();
+
+                            if (await _largeFileLock.WaitAsync(200, token))
+                            {
+                                largeFileLockAcquired = true;
+                                break;
+                            }
+                        }
 
                         OnJobBlocked?.Invoke(job.Name, false);
-                        lock (_stateLock)
-                        {
-                            _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE");
-                        }
+                        lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE"); }
                     }
                 }
 
@@ -281,8 +294,13 @@ namespace EasySave.Services
                 {
                     stopwatch.Start();
 
-                    if (shouldEncrypt) ExecuteCryptoSoft(source, target, job, settings.EncryptionKey);
-                    else File.Copy(source, target, true);
+                    if (shouldEncrypt)
+                        ExecuteCryptoSoft(source, target, job.Name, settings.EncryptionKey, pauseEvent, token);
+                    else
+                    {
+                        token.ThrowIfCancellationRequested();
+                        File.Copy(source, target, true);
+                    }
 
                     stopwatch.Stop();
                     timeMs = stopwatch.ElapsedMilliseconds;
@@ -302,9 +320,12 @@ namespace EasySave.Services
                     OnJobProgress?.Invoke(job.Name, currentProgress);
                     OnProgressUpdate?.Invoke(source, 0);
                 }
+                catch (OperationCanceledException)
+                {
+                    throw; // Remonter l'annulation pour interrompre le job entier proprement
+                }
                 catch (Exception ex)
                 {
-                    // DETECTION D'ECHEC (Ex: Fichier trop lourd pour CryptoSoft)
                     stopwatch.Stop();
                     timeMs = -1;
                     string errMsg = settings.Language == "FR" ? $"❌ Échec copie {Path.GetFileName(source)} : {ex.Message}" : $"❌ Copy failed {Path.GetFileName(source)} : {ex.Message}";
@@ -313,7 +334,8 @@ namespace EasySave.Services
             }
             finally
             {
-                if (isLargeFile)
+                // Ne libère le verrou que si le processus actuel a véritablement réussi à l'obtenir
+                if (largeFileLockAcquired)
                 {
                     _largeFileLock.Release();
                 }
@@ -329,33 +351,41 @@ namespace EasySave.Services
             }, job.Id.ToString(), settings.LogFormat);
         }
 
-        private void ExecuteCryptoSoft(string source, string target, BackupJob job, string encryptionKey)
+        private void ExecuteCryptoSoft(string source, string target, string jobName, string encryptionKey, ManualResetEvent pauseEvent, CancellationToken token)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
             if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe missing.");
 
-            bool isWaitingFired = false;
-            bool acquired = _cryptoSoftLock.Wait(0);
-
-            if (!acquired)
-            {
-                isWaitingFired = true;
-                OnJobWaiting?.Invoke(job.Name, true);
-                lock (_stateLock)
-                {
-                    _stateTracker.UpdateState(job.Name, s => s.State = "WAITING");
-                }
-                _cryptoSoftLock.Wait();
-
-                OnJobWaiting?.Invoke(job.Name, false);
-                lock (_stateLock)
-                {
-                    _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE");
-                }
-            }
+            bool cryptoLockAcquired = false;
 
             try
             {
+                if (_cryptoSoftLock.Wait(0))
+                {
+                    cryptoLockAcquired = true;
+                }
+                else
+                {
+                    OnJobWaiting?.Invoke(jobName, true);
+                    lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "WAITING"); }
+
+                    while (true)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        pauseEvent?.WaitOne();
+                        token.ThrowIfCancellationRequested();
+
+                        if (_cryptoSoftLock.Wait(200, token))
+                        {
+                            cryptoLockAcquired = true;
+                            break;
+                        }
+                    }
+
+                    OnJobWaiting?.Invoke(jobName, false);
+                    lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "ACTIVE"); }
+                }
+
                 string safeKey = string.IsNullOrWhiteSpace(encryptionKey) ? "EasySaveKey" : encryptionKey;
                 ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\" \"{safeKey}\"")
                 {
@@ -364,11 +394,25 @@ namespace EasySave.Services
                 };
 
                 using Process p = Process.Start(psi);
+                int elapsed = 0;
 
-                if (!p.WaitForExit(60000))
+                // Surveillance dynamique du processus pour permettre son annulation en plein vol
+                while (!p.HasExited)
                 {
-                    p.Kill();
-                    throw new TimeoutException("Timeout: CryptoSoft s'est bloqué et a dû être forcé à s'arrêter.");
+                    if (token.IsCancellationRequested)
+                    {
+                        try { p.Kill(); } catch { }
+                        token.ThrowIfCancellationRequested();
+                    }
+
+                    Thread.Sleep(100);
+                    elapsed += 100;
+
+                    if (elapsed > 60000)
+                    {
+                        try { p.Kill(); } catch { }
+                        throw new TimeoutException("Timeout: CryptoSoft s'est bloqué et a dû être forcé à s'arrêter.");
+                    }
                 }
 
                 if (p.ExitCode != 0)
@@ -376,9 +420,16 @@ namespace EasySave.Services
                     throw new InvalidOperationException($"CryptoSoft a échoué avec le code d'erreur : {p.ExitCode}");
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             finally
             {
-                _cryptoSoftLock.Release();
+                if (cryptoLockAcquired)
+                {
+                    _cryptoSoftLock.Release();
+                }
             }
         }
     }

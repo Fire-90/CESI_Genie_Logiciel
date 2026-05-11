@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d" Background="Transparent">
 
-	<ScrollViewer VerticalScrollBarVisibility="Auto">
+	<ScrollViewer VerticalScrollBarVisibility="Auto" DataContext="{Binding SettingsVM}">
 		<StackPanel Margin="20">
 			<TextBlock Text="{Binding LanguageService[TabSettings]}" FontSize="28" FontWeight="Bold" Margin="0,0,0,30" Foreground="#2C3E50"/>
 
@@ -58,7 +58,8 @@
 
 							<StackPanel Orientation="Horizontal" Margin="0,0,0,15">
 								<TextBlock Text="{Binding LanguageService[LblStatusNetwork]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,10,0"/>
-								<TextBlock Text="{Binding ConnectionStatusText}" Foreground="{Binding ConnectionStatusColor}" FontWeight="Bold"/>
+								<TextBlock Text="{Binding DataContext.NetworkVM.ConnectionStatusText, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           Foreground="{Binding DataContext.NetworkVM.ConnectionStatusColor, RelativeSource={RelativeSource AncestorType=UserControl}}" FontWeight="Bold"/>
 							</StackPanel>
 
 							<TextBlock Text="{Binding LanguageService[LblClientName]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
