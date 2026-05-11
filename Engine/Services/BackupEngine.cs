@@ -103,6 +103,7 @@ namespace EasySave.Services
                     wasSuspendedBySoftware = true;
                     OnJobSuspendedBySoftware?.Invoke(jobName, true, blocking);
                     lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "SUSPENDED"); }
+                    OnActivityMessage?.Invoke($"{jobName} : PAUSE (Logiciel métier : {blocking})");
                 }
                 await Task.Delay(1000, token);
             }
@@ -111,6 +112,7 @@ namespace EasySave.Services
             {
                 OnJobSuspendedBySoftware?.Invoke(jobName, false, null);
                 lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "ACTIVE"); }
+                OnActivityMessage?.Invoke($"{jobName} : REPRISE");
             }
         }
 
@@ -140,7 +142,6 @@ namespace EasySave.Services
 
             try
             {
-                // SIGNAL DE DÉBUT
                 OnActivityMessage?.Invoke($"{job.Name} : START");
 
                 foreach (string file in priorityFiles)
@@ -177,7 +178,6 @@ namespace EasySave.Services
             catch (OperationCanceledException) { throw new Exception("Job stopped manually."); }
             finally
             {
-                // SIGNAL DE FIN
                 OnActivityMessage?.Invoke($"{job.Name} : END");
 
                 if (remainingPriorityFiles > 0)
@@ -222,8 +222,10 @@ namespace EasySave.Services
         private async Task CopyFileWithLoggingAsync(string source, string target, BackupJob job, long fileSize, CancellationToken token)
         {
             lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.SourceFilePath = source; s.TargetFilePath = target; }); }
-            Stopwatch stopwatch = new Stopwatch();
-            long timeMs = 0;
+
+            Stopwatch totalSw = new Stopwatch();
+            long encryptionTime = 0;
+
             var settings = _configManager.LoadSettings();
             bool shouldEncrypt = (settings.EncryptedExtensions ?? new List<string>()).Contains(Path.GetExtension(source).ToLower());
             long limitInBytes = settings.MaxParallelFileSizeLimit * (settings.MaxParallelFileSizeLimitUnit switch { "Mo" => 1024L * 1024L, "Go" => 1024L * 1024L * 1024L, _ => 1024L });
@@ -239,6 +241,8 @@ namespace EasySave.Services
                     {
                         OnJobBlocked?.Invoke(job.Name, true);
                         lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED"); }
+                        OnActivityMessage?.Invoke($"{job.Name} : BLOQUÉ (Limite de taille dépassée par {Path.GetFileName(source)})");
+
                         while (true)
                         {
                             token.ThrowIfCancellationRequested();
@@ -251,23 +255,50 @@ namespace EasySave.Services
                     }
                 }
 
-                stopwatch.Start();
-                if (shouldEncrypt) ExecuteCryptoSoft(source, target, job.Name, settings.EncryptionKey, token);
-                else { token.ThrowIfCancellationRequested(); File.Copy(source, target, true); }
-                stopwatch.Stop();
-                timeMs = stopwatch.ElapsedMilliseconds;
+                totalSw.Start();
+                if (shouldEncrypt)
+                {
+                    encryptionTime = ExecuteCryptoSoft(source, target, job.Name, settings.EncryptionKey, token);
+                }
+                else
+                {
+                    token.ThrowIfCancellationRequested();
+                    File.Copy(source, target, true);
+                }
+                totalSw.Stop();
 
                 lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression); }); }
                 OnProgressUpdate?.Invoke(source, 0);
+
+                await DailyLogger.Instance.WriteLogAsync(new LogEntry
+                {
+                    Name = job.Name,
+                    FileSource = source,
+                    FileTarget = target,
+                    FileSize = fileSize,
+                    FileTransferTime = totalSw.ElapsedMilliseconds,
+                    EncryptionTime = encryptionTime // On passe le temps mesuré ici
+                }, job.Id.ToString(), settings.LogFormat);
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception ex) { stopwatch.Stop(); timeMs = -1; OnActivityMessage?.Invoke($"❌ Error: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                totalSw.Stop();
+                OnActivityMessage?.Invoke($"{job.Name} : ERREUR {ex.Message}");
+                await DailyLogger.Instance.WriteLogAsync(new LogEntry
+                {
+                    Name = job.Name,
+                    FileSource = source,
+                    FileTarget = target,
+                    FileSize = fileSize,
+                    FileTransferTime = -1,
+                    EncryptionTime = -1
+                }, job.Id.ToString(), settings.LogFormat);
+            }
             finally { if (largeFileLockAcquired) _largeFileLock.Release(); }
-
-            await DailyLogger.Instance.WriteLogAsync(new LogEntry { Name = job.Name, FileSource = source, FileTarget = target, FileSize = fileSize, FileTransferTime = timeMs }, job.Id.ToString(), settings.LogFormat);
         }
 
-        private void ExecuteCryptoSoft(string source, string target, string jobName, string encryptionKey, CancellationToken token)
+        private long ExecuteCryptoSoft(string source, string target, string jobName, string encryptionKey, CancellationToken token)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
             if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe missing.");
@@ -280,6 +311,8 @@ namespace EasySave.Services
                 {
                     OnJobWaiting?.Invoke(jobName, true);
                     lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "WAITING"); }
+                    OnActivityMessage?.Invoke($"{jobName} : EN ATTENTE (Chiffrement simultané limité)");
+
                     while (true)
                     {
                         token.ThrowIfCancellationRequested();
@@ -291,13 +324,21 @@ namespace EasySave.Services
 
                 string safeKey = string.IsNullOrWhiteSpace(encryptionKey) ? "EasySaveKey" : encryptionKey;
                 ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\" \"{safeKey}\"") { CreateNoWindow = true, UseShellExecute = false };
+
+                Stopwatch cryptoSw = new Stopwatch();
                 using Process p = Process.Start(psi);
+                cryptoSw.Start();
+
                 while (!p.HasExited)
                 {
                     if (token.IsCancellationRequested) { try { p.Kill(); } catch { } token.ThrowIfCancellationRequested(); }
-                    Thread.Sleep(100);
+                    Thread.Sleep(50);
+                    if (cryptoSw.ElapsedMilliseconds > 60000) { try { p.Kill(); } catch { } throw new TimeoutException("CryptoSoft timeout."); }
                 }
-                if (p.ExitCode != 0) throw new InvalidOperationException($"CryptoSoft Error: {p.ExitCode}");
+                cryptoSw.Stop();
+
+                if (p.ExitCode != 0) return -p.ExitCode; // Temps négatif pour les codes d'erreur
+                return cryptoSw.ElapsedMilliseconds;
             }
             finally { if (cryptoLockAcquired) _cryptoSoftLock.Release(); }
         }

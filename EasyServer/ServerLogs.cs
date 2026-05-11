@@ -27,12 +27,14 @@ namespace EasyServer
     [Serializable]
     public class ClientLogEntry
     {
-        public string Name { get; set; }
+        public string JobId { get; set; } // Identifiant du travail (Job)
+        public string Name { get; set; }  // Nom du travail
         public string FileSource { get; set; }
         public string FileTarget { get; set; }
         public long FileSize { get; set; }
         public double FileTransferTime { get; set; }
-        public string time { get; set; }
+        public double EncryptionTime { get; set; } // Temps de chiffrement (en ms)
+        public string time { get; set; } // Horodatage fourni par le client
     }
 
     public sealed class ServerLogger
@@ -46,21 +48,26 @@ namespace EasyServer
         private ServerLogger()
         {
             _baseDataDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+            if (!Directory.Exists(_baseDataDirectory)) Directory.CreateDirectory(_baseDataDirectory);
         }
 
+        /// <summary>
+        /// Écrit dans le journal de connexion global : data/connection_history.json
+        /// </summary>
         public async Task WriteConnectionLogAsync(ServerLogEntry entry, string clientId)
         {
-            string clientDir = Path.Combine(_baseDataDirectory, clientId.Replace(":", "-"), "logs");
-            if (!Directory.Exists(clientDir)) Directory.CreateDirectory(clientDir);
-
-            string filePath = Path.Combine(clientDir, "connection_history.json");
+            entry.ClientId = clientId;
+            string filePath = Path.Combine(_baseDataDirectory, "connection_history.json");
 
             lock (_lockObj)
             {
                 List<ServerLogEntry> logs = new List<ServerLogEntry>();
                 if (File.Exists(filePath))
                 {
-                    try { logs = JsonSerializer.Deserialize<List<ServerLogEntry>>(File.ReadAllText(filePath)) ?? new List<ServerLogEntry>(); }
+                    try
+                    {
+                        logs = JsonSerializer.Deserialize<List<ServerLogEntry>>(File.ReadAllText(filePath)) ?? new List<ServerLogEntry>();
+                    }
                     catch { }
                 }
                 logs.Add(entry);
@@ -69,21 +76,29 @@ namespace EasyServer
             await Task.CompletedTask;
         }
 
-        // --- MÉTHODE MANQUANTE AJOUTÉE ICI ---
+        /// <summary>
+        /// Écrit les logs de sauvegarde dans le dossier du client : data/ID/logs/
+        /// Tous les jobs du client sont regroupés dans le fichier du jour.
+        /// </summary>
         public async Task WriteClientLogAsync(string jsonEntry, string clientId, string jobId, string format)
         {
-            string clientDir = Path.Combine(_baseDataDirectory, clientId.Replace(":", "-"), "logs", $"job_{jobId}");
-            if (!Directory.Exists(clientDir)) Directory.CreateDirectory(clientDir);
+            string safeClientId = clientId.Replace(":", "-");
+            string clientLogDir = Path.Combine(_baseDataDirectory, safeClientId, "logs");
+
+            if (!Directory.Exists(clientLogDir)) Directory.CreateDirectory(clientLogDir);
 
             try
             {
                 var entry = JsonSerializer.Deserialize<ClientLogEntry>(jsonEntry);
                 if (entry == null) return;
 
+                // On injecte le JobId qui manque souvent dans le JSON brut du client
+                entry.JobId = jobId;
+
                 if (format.ToLower() == "xml")
-                    WriteXmlClientLog(entry, clientDir);
+                    WriteXmlClientLog(entry, clientLogDir);
                 else
-                    WriteJsonClientLog(entry, clientDir);
+                    WriteJsonClientLog(entry, clientLogDir);
             }
             catch { }
             await Task.CompletedTask;

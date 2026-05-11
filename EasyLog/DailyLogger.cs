@@ -26,6 +26,9 @@ namespace EasyLog
         [JsonPropertyName("FileTransferTime")]
         public double FileTransferTime { get; set; }
 
+        [JsonPropertyName("EncryptionTime")]
+        public double EncryptionTime { get; set; }
+
         [JsonPropertyName("time")]
         public string Time { get; set; } = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
     }
@@ -39,7 +42,6 @@ namespace EasyLog
         private readonly string _settingsFilePath;
         private static readonly object _lockObj = new object();
 
-        // Événement déclenché pour envoi au serveur
         public static event Action<string, string, LogEntry> OnLogGenerated;
 
         private DailyLogger()
@@ -49,7 +51,6 @@ namespace EasyLog
             _settingsFilePath = Path.Combine(exePath, "Data", "settings.json");
         }
 
-        // Récupère Format et Destination
         private (string format, string destination) GetLogSettings()
         {
             string format = "json";
@@ -77,18 +78,14 @@ namespace EasyLog
             var settings = GetLogSettings();
             string currentFormat = logFormat ?? settings.format;
             string destination = settings.destination;
-
             string logDirectory = Path.Combine(_baseDataDirectory, "logs");
 
-            // Sauvegarde en Local
             if (destination.Equals("LocalOnly", StringComparison.OrdinalIgnoreCase) ||
                 destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
             {
                 lock (_lockObj)
                 {
-                    if (!Directory.Exists(logDirectory))
-                        Directory.CreateDirectory(logDirectory);
-
+                    if (!Directory.Exists(logDirectory)) Directory.CreateDirectory(logDirectory);
                     if (currentFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
                         WriteXmlLog(entry, logDirectory);
                     else
@@ -96,13 +93,11 @@ namespace EasyLog
                 }
             }
 
-            // Envoi au Serveur via l'événement
             if (destination.Equals("ServerOnly", StringComparison.OrdinalIgnoreCase) ||
                 destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
             {
                 OnLogGenerated?.Invoke(jobId, currentFormat, entry);
             }
-
             await Task.CompletedTask;
         }
 
@@ -112,7 +107,6 @@ namespace EasyLog
             string filePath = Path.Combine(logDirectory, fileName);
             List<LogEntry> logs = new List<LogEntry>();
 
-            // On vérifie d'abord si le fichier existe pour éviter le crash (FileNotFoundException)
             if (File.Exists(filePath))
             {
                 int maxRetries = 5;
@@ -122,25 +116,16 @@ namespace EasyLog
                     {
                         string existingJson = File.ReadAllText(filePath);
                         if (!string.IsNullOrWhiteSpace(existingJson))
-                        {
                             logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
-                        }
-                        break; // SUCCÈS : on sort de la boucle de tentatives
+                        break;
                     }
-                    catch (IOException) // Fichier actuellement verrouillé par un autre processus
-                    {
-                        System.Threading.Thread.Sleep(50); // On attend 50ms avant de réessayer
-                    }
-                    catch (JsonException)
-                    {
-                        break; // Fichier corrompu, on arrête de réessayer pour l'écraser
-                    }
+                    catch (IOException) { System.Threading.Thread.Sleep(50); }
+                    catch (JsonException) { break; }
                 }
             }
 
             logs.Add(entry);
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            File.WriteAllText(filePath, JsonSerializer.Serialize(logs, options));
+            File.WriteAllText(filePath, JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true }));
         }
 
         private void WriteXmlLog(LogEntry entry, string logDirectory)
@@ -150,7 +135,6 @@ namespace EasyLog
             List<LogEntry> logs = new List<LogEntry>();
             XmlSerializer serializer = new XmlSerializer(typeof(List<LogEntry>));
 
-            // On vérifie d'abord si le fichier existe pour éviter le crash
             if (File.Exists(filePath))
             {
                 int maxRetries = 5;
@@ -159,27 +143,17 @@ namespace EasyLog
                     try
                     {
                         using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                        {
                             logs = (List<LogEntry>)serializer.Deserialize(fs);
-                        }
-                        break; // SUCCÈS : on sort de la boucle
+                        break;
                     }
-                    catch (IOException) // Fichier verrouillé
-                    {
-                        System.Threading.Thread.Sleep(50);
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        break; // XML Corrompu, on l'écrase
-                    }
+                    catch (IOException) { System.Threading.Thread.Sleep(50); }
+                    catch (InvalidOperationException) { break; }
                 }
             }
 
             logs.Add(entry);
             using (FileStream fs = new FileStream(filePath, FileMode.Create))
-            {
                 serializer.Serialize(fs, logs);
-            }
         }
     }
 }

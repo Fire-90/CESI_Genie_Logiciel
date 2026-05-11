@@ -84,6 +84,9 @@ namespace EasyServer
                         }
                         else
                         {
+                            // AFFICHAGE DANS LA CONSOLE DU SERVEUR
+                            Console.WriteLine($"[MESSAGE] Reçu de {clientId} : {msg}");
+
                             string broadcastMsg = msg;
                             if (msg.StartsWith("[START]") || msg.StartsWith("[END]") || msg.StartsWith("[PROGRESS]") || msg.StartsWith("[ERROR]"))
                             {
