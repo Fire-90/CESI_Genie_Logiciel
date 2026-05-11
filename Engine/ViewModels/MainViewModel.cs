@@ -24,6 +24,7 @@ namespace EasySave.ViewModels
 
         public LanguageService LanguageService { get; } = new LanguageService();
 
+        // --- PROPRIÉTÉS DES TRAVAUX ---
         public ObservableCollection<JobViewModel> Jobs { get; }
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
         public bool IsJobSelected => SelectedJob != null;
@@ -39,8 +40,6 @@ namespace EasySave.ViewModels
                     _selectedJob = value;
                     OnPropertyChanged(nameof(SelectedJob));
                     OnPropertyChanged(nameof(IsJobSelected));
-                    (ExecuteSelectionCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                    (DeleteJobCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
         }
@@ -59,6 +58,7 @@ namespace EasySave.ViewModels
             }
         }
 
+        // --- PROPRIÉTÉS DES PARAMÈTRES (AUTO-SAVE) ---
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
 
@@ -147,6 +147,7 @@ namespace EasySave.ViewModels
                     var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim()).ToList();
                     CurrentSettings.PriorityExtensions = extensions;
                     OnPropertyChanged(nameof(PriorityExtensionsString));
+                    SaveConfig(); // CORRECTIF : Maintenant enregistré automatiquement
                 }
             }
         }
@@ -169,7 +170,6 @@ namespace EasySave.ViewModels
 
         // --- STATUT DU RÉSEAU ---
         private ConnectionStatus _currentConnectionStatus = ConnectionStatus.Disconnected;
-
         private string _connectionStatusText = "Échec / Déconnecté";
         public string ConnectionStatusText
         {
@@ -177,14 +177,14 @@ namespace EasySave.ViewModels
             set { _connectionStatusText = value; OnPropertyChanged(nameof(ConnectionStatusText)); }
         }
 
-        private string _connectionStatusColor = "#E74C3C"; // Rouge
+        private string _connectionStatusColor = "#E74C3C";
         public string ConnectionStatusColor
         {
             get => _connectionStatusColor;
             set { _connectionStatusColor = value; OnPropertyChanged(nameof(ConnectionStatusColor)); }
         }
 
-        // --- PROPRIÉTÉ POUR LE RÉSEAU (CLIENTS DISTANTS UNIQUEMENT) ---
+        // --- ÉTATS DISTANTS (SERVEUR) ---
         private ObservableCollection<RemoteClientState> _remoteStates;
         public ObservableCollection<RemoteClientState> RemoteStates
         {
@@ -192,6 +192,7 @@ namespace EasySave.ViewModels
             set { _remoteStates = value; OnPropertyChanged(nameof(RemoteStates)); }
         }
 
+        // --- COMMANDES ---
         public ICommand AddJobCommand { get; }
         public ICommand ExecuteSelectionCommand { get; }
         public ICommand DeleteJobCommand { get; }
@@ -200,11 +201,6 @@ namespace EasySave.ViewModels
         public ICommand RemoveSoftwareCommand { get; }
         public ICommand RefreshProcessesCommand { get; }
         public ICommand ToggleSettingsCommand { get; }
-
-        // Team feature (Pause / Resume / Stop jobs via the DataGrid buttons)
-        public ICommand PauseJobCommand { get; }
-        public ICommand ResumeJobCommand { get; }
-        public ICommand StopJobCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
         {
@@ -224,12 +220,14 @@ namespace EasySave.ViewModels
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
             RemoteStates = new ObservableCollection<RemoteClientState>();
 
+            // Événements Backup
             _backupEngine.OnProgressUpdate += (file, remaining) =>
             {
                 CurrentFile = file;
                 _networkService.SendMessage($"[PROGRESS] {file}");
             };
 
+            // Événements Logs & State
             EasyLog.DailyLogger.OnLogGenerated += (jobId, format, entry) =>
             {
                 try
@@ -248,15 +246,7 @@ namespace EasySave.ViewModels
             _networkService.OnMessageReceived += HandleNetworkMessage;
             _networkService.OnConnectionStatusChanged += HandleConnectionStatusChanged;
 
-            _backupEngine.OnJobProgress += (jobName, progress) =>
-            {
-                _uiContext?.Post(_ =>
-                {
-                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
-                    if (jobVm != null) jobVm.Progress = progress;
-                }, null);
-            };
-
+            // Initialisation Commandes
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
@@ -266,14 +256,7 @@ namespace EasySave.ViewModels
             RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
             RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
 
-            // Job controls
-            PauseJobCommand = new RelayCommand(ExecutePauseJob);
-            ResumeJobCommand = new RelayCommand(ExecuteResumeJob);
-            StopJobCommand = new RelayCommand(ExecuteStopJob);
-
             this.LanguageService.CurrentLanguage = CurrentSettings.Language;
-            ExecuteRefreshProcesses(null);
-            ChangeLanguage(CurrentSettings.Language);
 
             StartAutoRefresh();
         }
@@ -321,17 +304,17 @@ namespace EasySave.ViewModels
                 if (_currentConnectionStatus == ConnectionStatus.Connected)
                 {
                     ConnectionStatusText = isEn ? "Connected" : "Connecté";
-                    ConnectionStatusColor = "#2ECC71"; // Vert
+                    ConnectionStatusColor = "#2ECC71";
                 }
                 else if (_currentConnectionStatus == ConnectionStatus.Connecting)
                 {
                     ConnectionStatusText = isEn ? "Connecting..." : "En cours...";
-                    ConnectionStatusColor = "#F39C12"; // Orange
+                    ConnectionStatusColor = "#F39C12";
                 }
                 else
                 {
                     ConnectionStatusText = isEn ? "Failed / Disconnected" : "Échec / Déconnecté";
-                    ConnectionStatusColor = "#E74C3C"; // Rouge
+                    ConnectionStatusColor = "#E74C3C";
                 }
             };
 
@@ -341,7 +324,6 @@ namespace EasySave.ViewModels
 
         private void HandleNetworkMessage(string message)
         {
-            // RECEPTION DU MESSAGE DE FIN DU SERVEUR
             if (message.StartsWith("[END]|"))
             {
                 var parts = message.Split(new[] { '|' }, 3);
@@ -361,7 +343,6 @@ namespace EasySave.ViewModels
                             job.NbFilesLeftToDo = 0;
                             job.LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
 
-                            // Temporisation de 3 secondes avant de remettre l'affichage en INACTIVE
                             _ = Task.Run(async () =>
                             {
                                 await Task.Delay(3000);
@@ -382,7 +363,6 @@ namespace EasySave.ViewModels
                     else showSuccessAction();
                 }
             }
-            // LECTURE DE LA BASE DES ETATS (Actualisation intelligente)
             else if (message.StartsWith("[STATES_RESPONSE]|"))
             {
                 string jsonPayload = message.Substring(18);
@@ -395,12 +375,9 @@ namespace EasySave.ViewModels
                         if (dict != null)
                         {
                             var activeClientIds = dict.Keys.ToList();
-
-                            // 1. On retire les clients déconnectés
                             var clientsToRemove = RemoteStates.Where(c => !activeClientIds.Contains(c.ClientId)).ToList();
                             foreach (var c in clientsToRemove) RemoteStates.Remove(c);
 
-                            // 2. On met à jour les clients connectés (sans écraser l'animation de succès)
                             foreach (var kvp in dict)
                             {
                                 if (kvp.Key == CurrentSettings.ClientName) continue;
@@ -420,13 +397,9 @@ namespace EasySave.ViewModels
                                         foreach (var pj in parsedJobs)
                                         {
                                             var existingJob = clientState.Jobs.FirstOrDefault(j => j.Name == pj.Name);
-                                            if (existingJob == null)
-                                            {
-                                                clientState.Jobs.Add(pj);
-                                            }
+                                            if (existingJob == null) clientState.Jobs.Add(pj);
                                             else
                                             {
-                                                // IMPORTANT : Si la carte est en train d'afficher "Save terminée", on ne l'écrase pas avec INACTIVE.
                                                 if ((existingJob.State == "Save terminée" || existingJob.State == "Finished") && pj.State == "INACTIVE")
                                                     continue;
 
@@ -469,15 +442,6 @@ namespace EasySave.ViewModels
             CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
             this.LanguageService.CurrentLanguage = lang;
-        }
-
-        private void SaveSettings(object parameter)
-        {
-            CurrentSettings.BusinessSoftwares = Softwares.ToList();
-            CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
-            _configManager.SaveSettings(CurrentSettings);
-            IsSettingsOpen = false;
-            SaveConfig();
             UpdateConnectionStatusUI();
         }
 
@@ -527,7 +491,6 @@ namespace EasySave.ViewModels
 
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
-                    jobVm.IsPaused = false;
                     _networkService.SendMessage($"[START] {jobVm.Name}");
 
                     tasks.Add(Task.Run(async () =>
@@ -535,36 +498,22 @@ namespace EasySave.ViewModels
                         try
                         {
                             await _backupEngine.ExecuteJobAsync(jobVm.Model);
-                            _networkService.SendMessage($"[END] {jobVm.Name} - Success");
+                            _networkService.SendMessage($"[END] {jobVm.Name}");
                         }
                         catch (Exception ex)
                         {
-                            string errorMsg = (ex is InvalidOperationException && ex.Message.StartsWith("BLOCKING|"))
-                                ? $"{this.LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
-                                : $"{this.LanguageService["MsgError"]} {ex.Message}";
-
-                            _uiContext?.Post(_ => CurrentFile = errorMsg, null);
+                            _uiContext?.Post(_ => CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}", null);
                             _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
                         }
-                        finally
-                        {
-                            jobVm.IsRunning = false;
-                            jobVm.IsPaused = false;
-                        }
+                        finally { jobVm.IsRunning = false; }
                     }));
                 }
-
                 await Task.WhenAll(tasks);
-
-                if (!CurrentFile.Contains("❌"))
-                {
-                    CurrentFile = this.LanguageService["MsgSuccessGlobal"];
-                }
+                if (!CurrentFile.Contains("❌")) CurrentFile = this.LanguageService["MsgSuccessGlobal"];
             }
             catch (Exception ex)
             {
                 CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
-                _networkService.SendMessage($"[ERROR] Global error: {ex.Message}");
             }
         }
 
@@ -573,82 +522,29 @@ namespace EasySave.ViewModels
             try
             {
                 CurrentFile = this.LanguageService["MsgStartGlobal"];
-                var tasks = new List<Task>();
-
                 foreach (var id in ids)
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
-                    jobVm.Progress = 0;
                     jobVm.IsRunning = true;
-                    jobVm.IsPaused = false;
                     _networkService.SendMessage($"[START] {jobVm.Name}");
-
-                    tasks.Add(Task.Run(async () =>
+                    try
                     {
-                        try
-                        {
-                            await _backupEngine.ExecuteJobAsync(jobVm.Model);
-                            _networkService.SendMessage($"[END] {jobVm.Name} - Success");
-                        }
-                        catch (Exception ex)
-                        {
-                            string errorMsg = (ex is InvalidOperationException && ex.Message.StartsWith("BLOCKING|"))
-                                ? $"{this.LanguageService["MsgBlockingSoftware"]} {ex.Message.Split('|')[1]}"
-                                : $"{this.LanguageService["MsgError"]} {ex.Message}";
-
-                            _uiContext?.Post(_ => CurrentFile = errorMsg, null);
-                            _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
-                        }
-                        finally
-                        {
-                            jobVm.IsRunning = false;
-                            jobVm.IsPaused = false;
-                        }
-                    }));
+                        await _backupEngine.ExecuteJobAsync(jobVm.Model);
+                        _networkService.SendMessage($"[END] {jobVm.Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
+                    }
+                    finally { jobVm.IsRunning = false; }
                 }
-
-                await Task.WhenAll(tasks);
-
-                if (!CurrentFile.Contains("❌"))
-                {
-                    CurrentFile = this.LanguageService["MsgSuccessGlobal"];
-                }
+                CurrentFile = this.LanguageService["MsgSuccessGlobal"];
             }
             catch (Exception ex)
             {
                 CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
-                _networkService.SendMessage($"[ERROR] Global error: {ex.Message}");
-            }
-        }
-
-        // Job Control Logics
-        private void ExecutePauseJob(object parameter)
-        {
-            if (parameter is JobViewModel job)
-            {
-                _backupEngine.PauseJob(job.Name);
-                job.IsPaused = true;
-            }
-        }
-
-        private void ExecuteResumeJob(object parameter)
-        {
-            if (parameter is JobViewModel job)
-            {
-                _backupEngine.ResumeJob(job.Name);
-                job.IsPaused = false;
-            }
-        }
-
-        private void ExecuteStopJob(object parameter)
-        {
-            if (parameter is JobViewModel job)
-            {
-                _backupEngine.StopJob(job.Name);
-                job.IsRunning = false;
-                job.IsPaused = false;
             }
         }
 
@@ -671,7 +567,12 @@ namespace EasySave.ViewModels
 
         private void ExecuteRemoveSoftware(object parameter)
         {
-            if (SelectedSoftware != null) Softwares.Remove(SelectedSoftware);
+            if (SelectedSoftware != null)
+            {
+                Softwares.Remove(SelectedSoftware);
+                CurrentSettings.BusinessSoftwares = Softwares.ToList();
+                SaveConfig();
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -689,9 +590,6 @@ namespace EasySave.ViewModels
         private int _totalFilesToCopy;
         [JsonPropertyName("TotalFilesToCopy")] public int TotalFilesToCopy { get => _totalFilesToCopy; set { _totalFilesToCopy = value; OnPropertyChanged(nameof(TotalFilesToCopy)); } }
 
-        private long _totalFilesSize;
-        [JsonPropertyName("TotalFilesSize")] public long TotalFilesSize { get => _totalFilesSize; set { _totalFilesSize = value; OnPropertyChanged(nameof(TotalFilesSize)); } }
-
         private int _nbFilesLeftToDo;
         [JsonPropertyName("NbFilesLeftToDo")] public int NbFilesLeftToDo { get => _nbFilesLeftToDo; set { _nbFilesLeftToDo = value; OnPropertyChanged(nameof(NbFilesLeftToDo)); } }
 
@@ -700,9 +598,6 @@ namespace EasySave.ViewModels
 
         private string _lastActionDate;
         [JsonPropertyName("LastActionDate")] public string LastActionDate { get => _lastActionDate; set { _lastActionDate = value; OnPropertyChanged(nameof(LastActionDate)); } }
-
-        private long _remainingFilesSize;
-        [JsonPropertyName("RemainingFilesSize")] public long RemainingFilesSize { get => _remainingFilesSize; set { _remainingFilesSize = value; OnPropertyChanged(nameof(RemainingFilesSize)); } }
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

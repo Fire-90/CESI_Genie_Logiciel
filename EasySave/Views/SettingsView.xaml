@@ -6,100 +6,102 @@
              mc:Ignorable="d" Background="Transparent">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="20"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <StackPanel Margin="20">
+            <TextBlock Text="{Binding LanguageService[TabSettings]}" FontSize="28" FontWeight="Bold" Margin="0,0,0,30" Foreground="#2C3E50"/>
 
-            <StackPanel Grid.Column="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                <Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="⚙ Paramètres Généraux" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+                <StackPanel Grid.Column="0">
 
-                        <TextBlock Text="Langue / Language" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                            <Button Content="EN" Command="{Binding ChangeLanguageCommand}" CommandParameter="EN" Width="60" Height="30" Margin="0,0,10,0" Background="#3498DB" Foreground="White" BorderThickness="0" Cursor="Hand"/>
-                            <Button Content="FR" Command="{Binding ChangeLanguageCommand}" CommandParameter="FR" Width="60" Height="30" Background="#3498DB" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                    <Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="⚙ Paramètres Généraux" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+
+                            <TextBlock Text="Langue / Language" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                                <Button Content="EN" Command="{Binding ChangeLanguageCommand}" CommandParameter="EN" Width="60" Height="30" Margin="0,0,10,0" Background="#3498DB" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                                <Button Content="FR" Command="{Binding ChangeLanguageCommand}" CommandParameter="FR" Width="60" Height="30" Background="#3498DB" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding LanguageService[LblLogFormat]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                            <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat, Mode=TwoWay}" Height="35" Margin="0,0,0,20" Padding="5"/>
+
+                            <TextBlock Text="{Binding LanguageService[LblLogDestination]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                            <ComboBox ItemsSource="{Binding AvailableLogDestinations}" SelectedItem="{Binding SelectedLogDestination, Mode=TwoWay}" Height="35" Padding="5"/>
                         </StackPanel>
+                    </Border>
 
-                        <TextBlock Text="{Binding LanguageService[LblLogFormat]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                        <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat, Mode=TwoWay}" Height="35" Margin="0,0,0,20" Padding="5"/>
+                    <Border Background="White" CornerRadius="10" Padding="20">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="🌐 Réseau" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
 
-                        <TextBlock Text="{Binding LanguageService[LblLogDestination]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                        <ComboBox ItemsSource="{Binding AvailableLogDestinations}" SelectedItem="{Binding SelectedLogDestination, Mode=TwoWay}" Height="35" Padding="5"/>
-                    </StackPanel>
-                </Border>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                                <TextBlock Text="Statut :" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,10,0"/>
+                                <TextBlock Text="{Binding ConnectionStatusText}" Foreground="{Binding ConnectionStatusColor}" FontWeight="Bold"/>
+                            </StackPanel>
 
-                <Border Background="White" CornerRadius="10" Padding="20">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="🌐 Réseau" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
+                            <TextBlock Text="Nom du Client :" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                            <TextBox Text="{Binding ClientName, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center" Margin="0,0,0,15"/>
 
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                            <TextBlock Text="Statut de connexion :" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,10,0"/>
-                            <TextBlock Text="{Binding ConnectionStatusText}" Foreground="{Binding ConnectionStatusColor}" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding LanguageService[LblServerIP]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                            <TextBox Text="{Binding ServerIP, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
                         </StackPanel>
+                    </Border>
+                </StackPanel>
 
-                        <TextBlock Text="Nom du Client (Identifiant) :" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                        <TextBox Text="{Binding ClientName, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center" Margin="0,0,0,15"/>
+                <StackPanel Grid.Column="2">
 
-                        <TextBlock Text="{Binding LanguageService[LblServerIP]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                        <TextBox Text="{Binding ServerIP, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
-                        <TextBlock Text="Les modifications sont enregistrées en quittant le champ." FontSize="11" Foreground="#BDC3C7" FontStyle="Italic" Margin="0,5,0,0"/>
-                    </StackPanel>
-                </Border>
+                    <Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="🔒 Sécurité" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
 
-            </StackPanel>
+                            <TextBlock Text="{Binding LanguageService[LblEncryptedExt]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                            <TextBox Text="{Binding EncryptedExtensionsString, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center" Margin="0,0,0,15"/>
 
-            <StackPanel Grid.Column="2">
+                            <TextBlock Text="{Binding LanguageService[LblPriorityExt]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                            <TextBox Text="{Binding PriorityExtensionsString, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center"/>
+                            <TextBlock Text="Séparez par des points-virgules (ex: .txt;.pdf)" FontSize="10" Foreground="#BDC3C7" Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Border>
 
-                <Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="🔒 Sécurité &amp; Chiffrement" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+                    <Border Background="White" CornerRadius="10" Padding="20">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <TextBlock Text="🚫 Logiciels Métiers" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+                            <TextBlock Text="{Binding LanguageService[Softwares]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
 
-                        <TextBlock Text="{Binding LanguageService[LblEncryptedExt]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                        <TextBox Text="{Binding EncryptedExtensionsString, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center" Margin="0,0,0,10"/>
-                        <TextBlock Text="Séparez les extensions par un point-virgule (ex: .txt;.pdf)" FontSize="11" Foreground="#BDC3C7" FontStyle="Italic"/>
-                    </StackPanel>
-                </Border>
+                            <Grid Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Text="{Binding NewSoftware, UpdateSourceTrigger=PropertyChanged}" Height="35" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
+                                <Button Grid.Column="1" Content="+" Command="{Binding AddSoftwareCommand}" Width="40" Background="#2ECC71" Foreground="White" FontSize="18" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+                            </Grid>
 
-                <Border Background="White" CornerRadius="10" Padding="20">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
-                    </Border.Effect>
-                    <StackPanel>
-                        <TextBlock Text="🚫 Logiciels Métiers" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+                            <ListBox ItemsSource="{Binding Softwares}" SelectedItem="{Binding SelectedSoftware}" Height="120" Margin="0,0,0,10" Padding="5" BorderBrush="#E0E0E0"/>
 
-                        <TextBlock Text="{Binding LanguageService[Softwares]}" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-
-                        <Grid Margin="0,0,0,15">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Text="{Binding NewSoftware, UpdateSourceTrigger=PropertyChanged}" Height="35" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
-                            <Button Grid.Column="1" Content="Ajouter" Command="{Binding AddSoftwareCommand}" Padding="15,0" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                        </Grid>
-
-                        <ListBox ItemsSource="{Binding Softwares}" SelectedItem="{Binding SelectedSoftware}" Height="120" Margin="0,0,0,15" Padding="5" BorderBrush="#E0E0E0"/>
-
-                        <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" Padding="15,8" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" HorizontalAlignment="Right" Cursor="Hand"/>
-                    </StackPanel>
-                </Border>
-
-            </StackPanel>
-
-        </Grid>
+                            <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" Padding="15,8" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" HorizontalAlignment="Right" Cursor="Hand"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
     </ScrollViewer>
 </UserControl>

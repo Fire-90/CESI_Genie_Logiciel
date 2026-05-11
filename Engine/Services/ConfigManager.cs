@@ -41,8 +41,11 @@ namespace EasySave.Services
             var settings = new AppSettings();
             for (int i = 1; i <= 5; i++)
             {
+                // Création de 5 emplacements vides par défaut
                 settings.Jobs.Add(new BackupJob(i, $"Save{i}", "", "", BackupType.Full));
             }
+
+            // Enregistrement initial
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(settings, options);
             File.WriteAllText(_settingsFilePath, json);
@@ -52,6 +55,7 @@ namespace EasySave.Services
 
         public void SaveSettings(AppSettings settings)
         {
+            // Protection contre l'effacement accidentel des travaux (Jobs)
             if (settings.Jobs == null || settings.Jobs.Count == 0)
             {
                 if (File.Exists(_settingsFilePath))
@@ -79,18 +83,17 @@ namespace EasySave.Services
     {
         public string Language { get; set; } = "FR";
         public string LogFormat { get; set; } = "json";
-        public string LogDestination { get; set; } = "LocalAndServer";
+        public string LogDestination { get; set; } = "LocalAndServer"; // LocalOnly, ServerOnly, LocalAndServer
         public string ServerIP { get; set; } = "127.0.0.1";
 
-        // Nouvel Identifiant Client
+        // Identifiant unique du client pour le serveur
         public string ClientName { get; set; } = "Client-" + Environment.MachineName;
 
         public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
         public List<string> BusinessSoftwares { get; set; } = new List<string> { "calculator", "notepad" };
         public List<string> EncryptedExtensions { get; set; } = new List<string> { ".txt", ".docx" };
 
-        // Defines priority file extensions
+        // Extensions de fichiers prioritaires (fusionné de old_ConfigManager)
         public List<string> PriorityExtensions { get; set; } = new List<string> { ".xml", ".txt" };
-
     }
 }
