@@ -86,10 +86,13 @@ namespace EasySave.Services
     public class AppSettings
     {
         public string Language { get; set; } = "FR";
-        public string LogFormat { get; set; } = "json";
-        public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
-
+        public string LogFormat { get; set; } = "JSON";
         public List<string> BusinessSoftwares { get; set; } = new List<string> { "calculator", "notepad" };
         public List<string> EncryptedExtensions { get; set; } = new List<string> { ".txt", ".docx" };
+
+        // Defines priority file extensions
+        public List<string> PriorityExtensions { get; set; } = new List<string> { ".xml", ".txt" };
+
+        public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
     }
 }

@@ -105,6 +105,28 @@ namespace EasySave.ViewModels
             }
         }
 
+        // Handles UI binding for priority extensions separated by semicolons
+        public string PriorityExtensionsString
+        {
+            get
+            {
+                if (CurrentSettings?.PriorityExtensions == null) return "";
+                return string.Join(";", CurrentSettings.PriorityExtensions);
+            }
+            set
+            {
+                if (CurrentSettings != null)
+                {
+                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                          .Select(e => e.Trim())
+                                          .ToList();
+
+                    CurrentSettings.PriorityExtensions = extensions;
+                    OnPropertyChanged(nameof(PriorityExtensionsString));
+                }
+            }
+        }
+
         private bool _isSettingsOpen = false;
         public bool IsSettingsOpen
         {
@@ -230,7 +252,8 @@ namespace EasySave.ViewModels
                     { "SaveSettings", "Save Settings" },
                     { "Softwares", "Blocking Business Softwares:" },
                     { "LblLogFormat", "Logs Format:" },
-                    { "LblEncryptedExt", "Encrypted Extensions (e.g., .txt;.pdf):" }
+                    { "LblEncryptedExt", "Encrypted Extensions (e.g., .txt;.pdf):" },
+                    { "LblPriorityExt", "Priority Extensions (e.g., .txt;.xml):" }
                 };
             }
             else
@@ -254,7 +277,8 @@ namespace EasySave.ViewModels
                     { "SaveSettings", "Enregistrer les paramètres" },
                     { "Softwares", "Logiciels métier bloquants :" },
                     { "LblLogFormat", "Format des logs :" },
-                    { "LblEncryptedExt", "Extensions à chiffrer (ex: .txt;.pdf) :" }
+                    { "LblEncryptedExt", "Extensions à chiffrer (ex: .txt;.pdf) :" },
+                    { "LblPriorityExt", "Extensions prioritaires (ex: .txt;.xml) :" }
                 };
             }
         }
@@ -326,6 +350,7 @@ namespace EasySave.ViewModels
 
                     jobVm.Progress = 0;
 
+                    // Offload execution to a background thread to prevent UI freezing
                     tasks.Add(Task.Run(() => _backupEngine.ExecuteJobAsync(jobVm.Model)));
                 }
 
