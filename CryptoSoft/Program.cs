@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace CryptoSoft
 {
@@ -8,43 +9,53 @@ namespace CryptoSoft
     {
         static int Main(string[] args)
         {
-            if (args.Length < 2)
+            // Mutex nommé "Global\CryptoSoft_Mutex" pour garantir qu'une seule instance s'exécute à la fois sur l'OS
+            bool createdNew;
+            using (Mutex mutex = new Mutex(true, "Global\\CryptoSoft_Mutex", out createdNew))
             {
-                return -1;
-            }
-
-            string sourceFile = args[0];
-            string targetFile = args[1];
-
-            string key = "EasySaveKey";
-
-            try
-            {
-
-                string targetDir = Path.GetDirectoryName(targetFile);
-                if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+                if (!createdNew)
                 {
-                    Directory.CreateDirectory(targetDir);
+                    // Le Mutex est déjà possédé par un autre processus CryptoSoft, on quitte.
+                    return -2;
                 }
 
-                byte[] fileBytes = File.ReadAllBytes(sourceFile);
-                byte[] keyBytes = Encoding.UTF8.GetBytes(key);
-
-                for (int i = 0; i < fileBytes.Length; i++)
+                if (args.Length < 2)
                 {
-                    fileBytes[i] = (byte)(fileBytes[i] ^ keyBytes[i % keyBytes.Length]);
+                    return -1;
                 }
 
-                File.WriteAllBytes(targetFile, fileBytes);
+                string sourceFile = args[0];
+                string targetFile = args[1];
 
-                System.Threading.Thread.Sleep(50);
+                string key = "EasySaveKey";
 
-                return 0;
-            }
-            catch (Exception)
-            {
-                return -1;
-            }
+                try
+                {
+                    string targetDir = Path.GetDirectoryName(targetFile);
+                    if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
+                    {
+                        Directory.CreateDirectory(targetDir);
+                    }
+
+                    byte[] fileBytes = File.ReadAllBytes(sourceFile);
+                    byte[] keyBytes = Encoding.UTF8.GetBytes(key);
+
+                    for (int i = 0; i < fileBytes.Length; i++)
+                    {
+                        fileBytes[i] = (byte)(fileBytes[i] ^ keyBytes[i % keyBytes.Length]);
+                    }
+
+                    File.WriteAllBytes(targetFile, fileBytes);
+
+                    System.Threading.Thread.Sleep(50);
+
+                    return 0;
+                }
+                catch (Exception)
+                {
+                    return -1;
+                }
+            } // Le Mutex est relâché automatiquement à la fin du bloc using
         }
     }
 }

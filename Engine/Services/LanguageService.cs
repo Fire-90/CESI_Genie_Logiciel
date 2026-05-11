@@ -68,6 +68,7 @@ namespace EasySave.Services
                 { "StateInactive", "INACTIVE" },
                 { "StateActive", "ACTIVE" },
                 { "StateSuspended", "SUSPENDED" },
+                { "StateWaiting", "WAITING" },
                 { "StateStopped", "JUST STOPPED" },
                 { "StateFinished", "FINISHED" },
 
@@ -127,6 +128,7 @@ namespace EasySave.Services
                 { "StateInactive", "INACTIF" },
                 { "StateActive", "ACTIF" },
                 { "StateSuspended", "SUSPENDU" },
+                { "StateWaiting", "EN ATTENTE" },
                 { "StateStopped", "ARRÊTÉ" },
                 { "StateFinished", "TERMINÉ" },
 

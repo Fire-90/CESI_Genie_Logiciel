@@ -240,6 +240,19 @@ namespace EasySave.ViewModels
                 _networkService.SendMessage($"[PROGRESS] {file}");
             };
 
+            // Événement d'attente sur le Mutex
+            _backupEngine.OnJobWaiting += (jobName, isWaiting) =>
+            {
+                Action updateWait = () =>
+                {
+                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
+                    if (jobVm != null) jobVm.IsWaiting = isWaiting;
+                };
+
+                if (_uiContext != null) _uiContext.Post(_ => updateWait(), null);
+                else updateWait();
+            };
+
             // Événement Progression Globale par Job
             _backupEngine.OnJobProgress += (jobName, progress) =>
             {
@@ -473,8 +486,9 @@ namespace EasySave.ViewModels
 
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            // Ignorer la sauvegarde pour toutes les propriétés liées à l'exécution UI
             if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" ||
-                e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused") return;
+                e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsWaiting") return;
 
             SaveConfig();
         }
@@ -535,6 +549,7 @@ namespace EasySave.ViewModels
 
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
+                    jobVm.IsWaiting = false;
 
                     var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
                     if (propertyInfo != null && propertyInfo.CanWrite)
@@ -569,6 +584,7 @@ namespace EasySave.ViewModels
                             Action resetAction = () =>
                             {
                                 jobVm.IsRunning = false;
+                                jobVm.IsWaiting = false;
                                 if (jobVm.Progress < 100) jobVm.Progress = 0;
                             };
 
@@ -601,6 +617,7 @@ namespace EasySave.ViewModels
 
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
+                    jobVm.IsWaiting = false;
 
                     var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
                     if (propertyInfo != null && propertyInfo.CanWrite)
@@ -632,6 +649,7 @@ namespace EasySave.ViewModels
                         Action resetAction = () =>
                         {
                             jobVm.IsRunning = false;
+                            jobVm.IsWaiting = false;
                             if (jobVm.Progress < 100) jobVm.Progress = 0;
                         };
 
@@ -685,6 +703,7 @@ namespace EasySave.ViewModels
             {
                 _backupEngine.StopJob(job.Name);
                 job.IsRunning = false;
+                job.IsWaiting = false;
 
                 var propertyInfo = job.GetType().GetProperty("IsPaused");
                 if (propertyInfo != null && propertyInfo.CanWrite)

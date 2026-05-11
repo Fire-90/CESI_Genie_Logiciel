@@ -16,15 +16,19 @@ namespace EasySave.Services
         public delegate void ProgressUpdateHandler(string currentFile, int remainingFiles);
         public event ProgressUpdateHandler OnProgressUpdate;
         public event Action<string, int> OnJobProgress;
+        public event Action<string, bool> OnJobWaiting; // <-- Nouvel événement pour l'attente
 
         private readonly StateTracker _stateTracker;
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
 
-        // Your work: Global counter for priority files across all threads (Barrier concept)
+        // Global counter for priority files across all threads (Barrier concept)
         private static int GlobalPriorityFilesCount = 0;
 
-        // Teammate's work: Thread control for Pause and Stop
+        // Verrou statique limitant l'exécution de CryptoSoft à 1 seul thread à la fois globalement
+        private static readonly SemaphoreSlim _cryptoSoftLock = new SemaphoreSlim(1, 1);
+
+        // Thread control for Pause and Stop
         private readonly ConcurrentDictionary<string, ManualResetEvent> _jobPauseEvents = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellationTokens = new();
 
@@ -233,7 +237,7 @@ namespace EasySave.Services
             {
                 stopwatch.Start();
 
-                if (shouldEncrypt) ExecuteCryptoSoft(source, target);
+                if (shouldEncrypt) ExecuteCryptoSoft(source, target, job);
                 else File.Copy(source, target, true);
 
                 stopwatch.Stop();
@@ -254,10 +258,11 @@ namespace EasySave.Services
                 OnJobProgress?.Invoke(job.Name, currentProgress);
                 OnProgressUpdate?.Invoke(source, 0);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 stopwatch.Stop();
                 timeMs = -1;
+                // Vous pouvez logguer l'exception 'ex' ici si nécessaire
             }
 
             await DailyLogger.Instance.WriteLogAsync(new LogEntry
@@ -270,16 +275,65 @@ namespace EasySave.Services
             }, job.Id.ToString(), settings.LogFormat);
         }
 
-        private void ExecuteCryptoSoft(string source, string target)
+        private void ExecuteCryptoSoft(string source, string target, BackupJob job)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
             if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe missing.");
 
-            ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\"")
-            { CreateNoWindow = true, UseShellExecute = false };
+            bool isWaitingFired = false;
 
-            using Process p = Process.Start(psi);
-            p.WaitForExit();
+            // Si un autre travail utilise déjà CryptoSoft, on signale qu'on passe en file d'attente
+            if (_cryptoSoftLock.CurrentCount == 0)
+            {
+                isWaitingFired = true;
+                OnJobWaiting?.Invoke(job.Name, true);
+                lock (_stateLock)
+                {
+                    _stateTracker.UpdateState(job.Name, s => s.State = "WAITING");
+                }
+            }
+
+            // Mise en file d'attente (verrou global) pour garantir le Mono-instance
+            _cryptoSoftLock.Wait();
+
+            try
+            {
+                // On s'assure de réinitialiser l'état à ACTIVE une fois le verrou obtenu
+                if (isWaitingFired)
+                {
+                    OnJobWaiting?.Invoke(job.Name, false);
+                    lock (_stateLock)
+                    {
+                        _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE");
+                    }
+                }
+
+                ProcessStartInfo psi = new ProcessStartInfo(path, $"\"{source}\" \"{target}\"")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+
+                using Process p = Process.Start(psi);
+
+                // On attend la fin avec un Timeout de 60 secondes maximum
+                if (!p.WaitForExit(60000))
+                {
+                    p.Kill();
+                    throw new TimeoutException("Timeout: CryptoSoft s'est bloqué et a dû être forcé à s'arrêter.");
+                }
+
+                // Vérification du code de retour du Mutex (-2) ou autre erreur (-1)
+                if (p.ExitCode != 0)
+                {
+                    throw new InvalidOperationException($"CryptoSoft a échoué avec le code d'erreur : {p.ExitCode}");
+                }
+            }
+            finally
+            {
+                // Libération du verrou pour le prochain fichier dans la file
+                _cryptoSoftLock.Release();
+            }
         }
     }
 }

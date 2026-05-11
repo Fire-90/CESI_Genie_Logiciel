@@ -83,6 +83,13 @@ namespace EasySave.ViewModels
             set { _isRunning = value; OnPropertyChanged(nameof(IsRunning)); }
         }
 
+        private bool _isWaiting;
+        public bool IsWaiting
+        {
+            get => _isWaiting;
+            set { _isWaiting = value; OnPropertyChanged(nameof(IsWaiting)); }
+        }
+
         private bool _isPaused;
         public bool IsPaused
         {

@@ -61,6 +61,10 @@
 												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateActive], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
 												<Setter Property="Foreground" Value="#2ECC71"/>
 											</DataTrigger>
+											<DataTrigger Binding="{Binding IsWaiting}" Value="True">
+												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateWaiting], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+												<Setter Property="Foreground" Value="#9B59B6"/>
+											</DataTrigger>
 											<DataTrigger Binding="{Binding IsPaused}" Value="True">
 												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateSuspended], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
 												<Setter Property="Foreground" Value="#F39C12"/>
