@@ -43,8 +43,6 @@ namespace EasyLog
         {
             string exePath = AppDomain.CurrentDomain.BaseDirectory;
             _logDirectory = Path.Combine(exePath, "data", "logs");
-
-            // Nouveau chemin vers les paramètres partagés
             _settingsFilePath = Path.Combine(exePath, "data", "settings.json");
 
             if (!Directory.Exists(_logDirectory))
@@ -53,33 +51,40 @@ namespace EasyLog
             }
         }
 
-        // NOUVEAU : Lecture dynamique du format depuis settings.json
         private string GetCurrentLogFormat()
         {
-            try
+            int maxRetries = 5;
+            for (int i = 0; i < maxRetries; i++)
             {
-                if (File.Exists(_settingsFilePath))
+                try
                 {
-                    string json = File.ReadAllText(_settingsFilePath);
-                    using (JsonDocument doc = JsonDocument.Parse(json))
+                    if (File.Exists(_settingsFilePath))
                     {
-                        if (doc.RootElement.TryGetProperty("LogFormat", out JsonElement formatElement))
+                        string json = File.ReadAllText(_settingsFilePath);
+                        using (JsonDocument doc = JsonDocument.Parse(json))
                         {
-                            return formatElement.GetString() ?? "json";
+                            if (doc.RootElement.TryGetProperty("LogFormat", out JsonElement formatElement))
+                            {
+                                return formatElement.GetString() ?? "json";
+                            }
                         }
                     }
+                    break;
                 }
-            }
-            catch
-            {
-                // En cas d'erreur de lecture, on garde le JSON par défaut
+                catch (IOException)
+                {
+                    System.Threading.Thread.Sleep(50);
+                }
+                catch
+                {
+                    break; // Fichier mal formaté, on arrête d'essayer
+                }
             }
             return "json";
         }
 
         public async Task WriteLogAsync(LogEntry entry)
         {
-            // Récupération du format de journal actuel avant d'écrire
             string currentFormat = GetCurrentLogFormat();
 
             lock (_lockObj)
@@ -103,25 +108,35 @@ namespace EasyLog
             string filePath = Path.Combine(_logDirectory, fileName);
             List<LogEntry> logs = new List<LogEntry>();
 
-            if (File.Exists(filePath))
+            int maxRetries = 5;
+            for (int r = 0; r < maxRetries; r++)
             {
                 try
                 {
-                    string existingJson = File.ReadAllText(filePath);
-                    if (!string.IsNullOrWhiteSpace(existingJson))
+                    if (File.Exists(filePath))
                     {
-                        logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
+                        string existingJson = File.ReadAllText(filePath);
+                        if (!string.IsNullOrWhiteSpace(existingJson))
+                        {
+                            logs = JsonSerializer.Deserialize<List<LogEntry>>(existingJson) ?? new List<LogEntry>();
+                        }
                     }
+
+                    logs.Add(entry);
+
+                    var options = new JsonSerializerOptions { WriteIndented = true };
+                    string jsonString = JsonSerializer.Serialize(logs, options);
+
+                    File.WriteAllText(filePath, jsonString);
+                    break; // Succès, on sort de la boucle
                 }
-                catch (JsonException) { /* Fichier ignoré si corrompu */ }
+                catch (IOException)
+                {
+                    if (r == maxRetries - 1) throw;
+                    System.Threading.Thread.Sleep(50);
+                }
+                catch (JsonException) { break; } // Corrompu, on abandonne
             }
-
-            logs.Add(entry);
-
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string jsonString = JsonSerializer.Serialize(logs, options);
-
-            File.WriteAllText(filePath, jsonString);
         }
 
         private void WriteXmlLog(LogEntry entry)
@@ -131,23 +146,33 @@ namespace EasyLog
             List<LogEntry> logs = new List<LogEntry>();
             XmlSerializer serializer = new XmlSerializer(typeof(List<LogEntry>));
 
-            if (File.Exists(filePath))
+            int maxRetries = 5;
+            for (int r = 0; r < maxRetries; r++)
             {
                 try
                 {
-                    using (FileStream fs = new FileStream(filePath, FileMode.Open))
+                    if (File.Exists(filePath))
                     {
-                        logs = (List<LogEntry>)serializer.Deserialize(fs);
+                        using (FileStream fs = new FileStream(filePath, FileMode.Open))
+                        {
+                            logs = (List<LogEntry>)serializer.Deserialize(fs);
+                        }
                     }
+
+                    logs.Add(entry);
+
+                    using (FileStream fs = new FileStream(filePath, FileMode.Create))
+                    {
+                        serializer.Serialize(fs, logs);
+                    }
+                    break; // Succès, on sort
                 }
-                catch (InvalidOperationException) { /* Fichier ignoré si corrompu */ }
-            }
-
-            logs.Add(entry);
-
-            using (FileStream fs = new FileStream(filePath, FileMode.Create))
-            {
-                serializer.Serialize(fs, logs);
+                catch (IOException)
+                {
+                    if (r == maxRetries - 1) throw;
+                    System.Threading.Thread.Sleep(50);
+                }
+                catch (InvalidOperationException) { break; } // Corrompu, on abandonne
             }
         }
     }

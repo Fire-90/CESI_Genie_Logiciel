@@ -50,16 +50,6 @@
                 </DataGrid.Resources>
 
                 <DataGrid.Columns>
-                    <DataGridCheckBoxColumn Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="40">
-                        <DataGridCheckBoxColumn.ElementStyle>
-                            <Style TargetType="CheckBox">
-                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Cursor" Value="Hand"/>
-                            </Style>
-                        </DataGridCheckBoxColumn.ElementStyle>
-                    </DataGridCheckBoxColumn>
-
                     <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" IsReadOnly="True"/>
 
                     <DataGridTextColumn Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150">
@@ -94,10 +84,69 @@
                         </DataGridTextColumn.HeaderTemplate>
                     </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="Progression" Width="120">
+                    <DataGridTemplateColumn Header="Statut" Width="160">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="15" Margin="5,0" Foreground="#2ECC71"/>
+                                <Grid Margin="5,2">
+
+                                    <Button Content="{Binding DataContext.UIStrings[BtnRun], RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                            Command="{Binding DataContext.ExecuteJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                            CommandParameter="{Binding}"
+                            Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+
+                                    <Grid>
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Grid Grid.Column="0" Margin="0,0,5,0">
+                                            <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="20" Foreground="#2ECC71"/>
+                                            <TextBlock Text="{Binding Progress, StringFormat={}{0}%}" 
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" 
+                                       FontSize="11" FontWeight="Bold" Foreground="Black"/>
+                                        </Grid>
+
+                                        <Button Grid.Column="1" Width="30" Height="20"
+                                Command="{Binding DataContext.PauseJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                CommandParameter="{Binding}"
+                                Background="#E67E22" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Content" Value="⏸"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                            <Setter Property="Content" Value="▶"/>
+                                                            <Setter Property="Background" Value="#3498DB"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
@@ -147,7 +196,6 @@
                 <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="{Binding UIStrings[BtnAdd]}" Command="{Binding AddJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
                     <Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding DeleteJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                    <Button Content="{Binding UIStrings[BtnRun]}" Command="{Binding ExecuteSelectionCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
                 </StackPanel>
             </Grid>
         </Grid>
