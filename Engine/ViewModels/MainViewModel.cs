@@ -132,6 +132,7 @@ namespace EasySave.ViewModels
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
         public ICommand SaveSettingsCommand { get; }
+        public ICommand StopJobCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine)
         {
@@ -185,6 +186,7 @@ namespace EasySave.ViewModels
             PauseJobCommand = new RelayCommand(TogglePauseJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
+            StopJobCommand = new RelayCommand(ExecuteStopJob);
 
             ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
 
@@ -371,6 +373,22 @@ namespace EasySave.ViewModels
                     CurrentFile = $"▶ Resuming backup {jobVm.Name}...";
                     _backupEngine.ResumeJob(jobVm.Name);
                 }
+            }
+        }
+
+        private void ExecuteStopJob(object parameter)
+        {
+            if (parameter is JobViewModel jobVm)
+            {
+                CurrentFile = $"⏹ Stopping backup {jobVm.Name}...";
+
+                _backupEngine.StopJob(jobVm.Name);
+
+                jobVm.IsRunning = false;
+                jobVm.IsPaused = false;
+                jobVm.Progress = 0;
+
+                CurrentFile = $"🛑 Backup {jobVm.Name} stopped.";
             }
         }
 
