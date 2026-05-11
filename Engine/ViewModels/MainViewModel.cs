@@ -169,10 +169,9 @@ namespace EasySave.ViewModels
 
         // --- STATUT DU RÉSEAU ---
         private ConnectionStatus _currentConnectionStatus = ConnectionStatus.Disconnected;
+
         private string _connectionStatusText = "Échec / Déconnecté";
         public string ConnectionStatusText
-        private ObservableCollection<ProcessInfo> _processes;
-        public ObservableCollection<ProcessInfo> Processes
         {
             get => _connectionStatusText;
             set { _connectionStatusText = value; OnPropertyChanged(nameof(ConnectionStatusText)); }
@@ -200,6 +199,7 @@ namespace EasySave.ViewModels
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
         public ICommand RefreshProcessesCommand { get; }
+        public ICommand ToggleSettingsCommand { get; }
 
         // Team feature (Pause / Resume / Stop jobs via the DataGrid buttons)
         public ICommand PauseJobCommand { get; }
@@ -477,7 +477,6 @@ namespace EasySave.ViewModels
             CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
             _configManager.SaveSettings(CurrentSettings);
             IsSettingsOpen = false;
-            LanguageService.CurrentLanguage = lang;
             SaveConfig();
             UpdateConnectionStatusUI();
         }
@@ -508,7 +507,6 @@ namespace EasySave.ViewModels
 
         private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
 
-        // Corrected block. Setting IsRunning to trigger the XAML UI visibility.
         private async void ExecuteSelectedJob(object parameter)
         {
             var jobsToRun = Jobs.Where(j => j.IsSelected).ToList();
@@ -528,7 +526,7 @@ namespace EasySave.ViewModels
                     if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
                     jobVm.Progress = 0;
-                    jobVm.IsRunning = true;   // Activates the Action buttons in XAML
+                    jobVm.IsRunning = true;
                     jobVm.IsPaused = false;
                     _networkService.SendMessage($"[START] {jobVm.Name}");
 
@@ -550,7 +548,6 @@ namespace EasySave.ViewModels
                         }
                         finally
                         {
-                            // Close UI buttons once execution finishes or crashes
                             jobVm.IsRunning = false;
                             jobVm.IsPaused = false;
                         }
@@ -562,7 +559,6 @@ namespace EasySave.ViewModels
                 if (!CurrentFile.Contains("❌"))
                 {
                     CurrentFile = this.LanguageService["MsgSuccessGlobal"];
-                    _networkService.SendMessage($"[END] {jobName}");
                 }
             }
             catch (Exception ex)
@@ -588,10 +584,6 @@ namespace EasySave.ViewModels
                     jobVm.IsRunning = true;
                     jobVm.IsPaused = false;
                     _networkService.SendMessage($"[START] {jobVm.Name}");
-                    string jobName = jobVm.Name;
-
-                    _networkService.SendMessage($"[START] {jobName}");
-
 
                     tasks.Add(Task.Run(async () =>
                     {
@@ -637,7 +629,7 @@ namespace EasySave.ViewModels
             if (parameter is JobViewModel job)
             {
                 _backupEngine.PauseJob(job.Name);
-                job.IsPaused = true; // Switches the Pause button to a Resume button visually
+                job.IsPaused = true;
             }
         }
 
@@ -682,52 +674,10 @@ namespace EasySave.ViewModels
             if (SelectedSoftware != null) Softwares.Remove(SelectedSoftware);
         }
 
-        private void ExecuteRefreshProcesses(object parameter)
-        {
-            try
-            {
-                var runningProcesses = System.Diagnostics.Process.GetProcesses()
-                    .Select(p => new ProcessInfo { Id = p.Id, Name = p.ProcessName })
-                    .ToList();
-
-                Processes.Clear();
-                foreach (var process in runningProcesses) Processes.Add(process);
-
-                _networkService.SendMessage("[GET_STATES]");
-            }
-            catch (Exception ex)
-            {
-                CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
-            }
-        }
-
-        private bool CanStopProcess(object parameter) => SelectedProcess != null;
-
-        private void ExecuteStopProcess(object parameter)
-        {
-            if (SelectedProcess == null) return;
-
-            try
-            {
-                var process = System.Diagnostics.Process.GetProcessById(SelectedProcess.Id);
-                process.Kill();
-                process.WaitForExit();
-                ExecuteRefreshProcesses(null);
-            }
-            catch (Exception ex)
-            {
-                CurrentFile = $"{this.LanguageService["MsgError"]} {ex.Message}";
-                Softwares.Remove(SelectedSoftware);
-                CurrentSettings.BusinessSoftwares = Softwares.ToList();
-                SaveConfig();
-            }
-        }
-
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    // Ajout d'INotifyPropertyChanged pour que l'interface puisse s'animer dynamiquement
     public class ClientJobState : INotifyPropertyChanged
     {
         private string _name;
