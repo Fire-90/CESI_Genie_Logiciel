@@ -76,6 +76,7 @@ namespace EasySave.ViewModels
                 {
                     CurrentSettings.LogFormat = newValue;
                     OnPropertyChanged(nameof(SelectedLogFormat));
+                    SaveConfig(); // Sauvegarde automatique
                 }
             }
         }
@@ -89,6 +90,7 @@ namespace EasySave.ViewModels
                 {
                     CurrentSettings.LogDestination = value;
                     OnPropertyChanged(nameof(SelectedLogDestination));
+                    SaveConfig(); // Sauvegarde automatique
                 }
             }
         }
@@ -102,6 +104,21 @@ namespace EasySave.ViewModels
                 {
                     CurrentSettings.ServerIP = value;
                     OnPropertyChanged(nameof(ServerIP));
+                    SaveConfig(); // Sauvegarde automatique (LostFocus depuis l'UI)
+                }
+            }
+        }
+
+        public string ClientName
+        {
+            get => CurrentSettings?.ClientName ?? "EasySaveClient";
+            set
+            {
+                if (CurrentSettings != null && CurrentSettings.ClientName != value)
+                {
+                    CurrentSettings.ClientName = value;
+                    OnPropertyChanged(nameof(ClientName));
+                    SaveConfig(); // Sauvegarde automatique (LostFocus depuis l'UI)
                 }
             }
         }
@@ -118,6 +135,7 @@ namespace EasySave.ViewModels
                                           .ToList();
                     CurrentSettings.EncryptedExtensions = extensions;
                     OnPropertyChanged(nameof(EncryptedExtensionsString));
+                    SaveConfig(); // Sauvegarde automatique (LostFocus depuis l'UI)
                 }
             }
         }
@@ -173,7 +191,6 @@ namespace EasySave.ViewModels
         public ICommand ToggleSettingsCommand { get; }
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
-        public ICommand SaveSettingsCommand { get; }
         public ICommand StopProcessCommand { get; }
         public ICommand RefreshProcessesCommand { get; }
 
@@ -223,7 +240,6 @@ namespace EasySave.ViewModels
             ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
             AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
-            SaveSettingsCommand = new RelayCommand(SaveSettings);
             StopProcessCommand = new RelayCommand(ExecuteStopProcess, CanStopProcess);
             RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
 
@@ -285,18 +301,8 @@ namespace EasySave.ViewModels
         {
             string lang = param as string ?? "FR";
             CurrentSettings.Language = lang;
-            CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
-            _configManager.SaveSettings(CurrentSettings);
-
             LanguageService.CurrentLanguage = lang;
-        }
-
-        private void SaveSettings(object parameter)
-        {
-            CurrentSettings.BusinessSoftwares = Softwares.ToList();
-            CurrentSettings.Jobs = Jobs.Select(j => j.Model).ToList();
-            _configManager.SaveSettings(CurrentSettings);
-            IsSettingsOpen = false;
+            SaveConfig(); // Sauvegarde automatique
         }
 
         private void ExecuteAddJob(object parameter)
@@ -384,13 +390,20 @@ namespace EasySave.ViewModels
             if (!string.IsNullOrWhiteSpace(NewSoftware) && !Softwares.Contains(NewSoftware))
             {
                 Softwares.Add(NewSoftware);
+                CurrentSettings.BusinessSoftwares = Softwares.ToList();
                 NewSoftware = "";
+                SaveConfig(); // Sauvegarde automatique
             }
         }
 
         private void ExecuteRemoveSoftware(object parameter)
         {
-            if (SelectedSoftware != null) Softwares.Remove(SelectedSoftware);
+            if (SelectedSoftware != null)
+            {
+                Softwares.Remove(SelectedSoftware);
+                CurrentSettings.BusinessSoftwares = Softwares.ToList();
+                SaveConfig(); // Sauvegarde automatique
+            }
         }
 
         private void ExecuteRefreshProcesses(object parameter)

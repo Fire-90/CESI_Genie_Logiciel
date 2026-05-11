@@ -8,15 +8,14 @@ namespace EasySave.Services
     public class NetworkService
     {
         private TcpClient _client;
-        private readonly string _ipAddress;
+        private readonly ConfigManager _configManager;
         private readonly int _port;
 
         public event Action<string> OnMessageReceived;
 
         public NetworkService(ConfigManager configManager, int port = 11000)
         {
-            var settings = configManager.LoadSettings();
-            _ipAddress = string.IsNullOrWhiteSpace(settings.ServerIP) ? "127.0.0.1" : settings.ServerIP;
+            _configManager = configManager;
             _port = port;
             StartConnectionLoop();
         }
@@ -31,11 +30,17 @@ namespace EasySave.Services
                     {
                         if (_client == null || !_client.Connected)
                         {
-                            _client = new TcpClient();
-                            await _client.ConnectAsync(_ipAddress, _port);
-                            SendMessage("[CONNEXION] Client EasySave connecté.");
+                            // Chargement dynamique de l'IP et du Nom (permet les modifs à chaud)
+                            var settings = _configManager.LoadSettings();
+                            string ipAddress = string.IsNullOrWhiteSpace(settings.ServerIP) ? "127.0.0.1" : settings.ServerIP;
+                            string clientName = string.IsNullOrWhiteSpace(settings.ClientName) ? "UnknownClient" : settings.ClientName;
 
-                            // Lancement de l'écoute des messages dès que la connexion est établie
+                            _client = new TcpClient();
+                            await _client.ConnectAsync(ipAddress, _port);
+
+                            // Envoi immédiat de l'identifiant
+                            SendMessage($"[IDENTIFY]|{clientName}");
+
                             _ = ReceiveLoop(_client);
                         }
                     }

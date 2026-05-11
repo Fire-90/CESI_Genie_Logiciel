@@ -41,10 +41,8 @@ namespace EasySave.Services
             var settings = new AppSettings();
             for (int i = 1; i <= 5; i++)
             {
-                // Création de 5 emplacements vides par défaut
                 settings.Jobs.Add(new BackupJob(i, $"Save{i}", "", "", BackupType.Full));
             }
-            // Enregistrement initial forcé sans la protection de liste vide
             var options = new JsonSerializerOptions { WriteIndented = true };
             string json = JsonSerializer.Serialize(settings, options);
             File.WriteAllText(_settingsFilePath, json);
@@ -54,8 +52,6 @@ namespace EasySave.Services
 
         public void SaveSettings(AppSettings settings)
         {
-            // Protection contre l'effacement accidentel des travaux (Jobs)
-            // Si la liste des travaux reçue est vide, on récupère celle déjà sauvegardée.
             if (settings.Jobs == null || settings.Jobs.Count == 0)
             {
                 if (File.Exists(_settingsFilePath))
@@ -66,14 +62,10 @@ namespace EasySave.Services
                         var existingSettings = JsonSerializer.Deserialize<AppSettings>(existingJson);
                         if (existingSettings != null && existingSettings.Jobs != null && existingSettings.Jobs.Count > 0)
                         {
-                            // Restauration des travaux existants
                             settings.Jobs = existingSettings.Jobs;
                         }
                     }
-                    catch (JsonException)
-                    {
-                        // En cas d'erreur de lecture, on ignore pour ne pas bloquer l'application
-                    }
+                    catch (JsonException) { }
                 }
             }
 
@@ -87,10 +79,13 @@ namespace EasySave.Services
     {
         public string Language { get; set; } = "FR";
         public string LogFormat { get; set; } = "json";
-        public string LogDestination { get; set; } = "LocalAndServer"; // LocalOnly, ServerOnly, LocalAndServer
+        public string LogDestination { get; set; } = "LocalAndServer";
         public string ServerIP { get; set; } = "127.0.0.1";
-        public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
 
+        // Nouvel Identifiant Client
+        public string ClientName { get; set; } = "Client-" + Environment.MachineName;
+
+        public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
         public List<string> BusinessSoftwares { get; set; } = new List<string> { "calculator", "notepad" };
         public List<string> EncryptedExtensions { get; set; } = new List<string> { ".txt", ".docx" };
     }

@@ -26,16 +26,8 @@ namespace EasyServer
                     TcpClient client = await _listener.AcceptTcpClientAsync();
                     lock (_lock) _clients.Add(client);
 
-                    string clientId = GetClientId(client);
-                    Console.WriteLine($"[CONNEXION] Client connecté : {clientId}");
-
-                    _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry
-                    {
-                        Action = "CONNEXION",
-                        Message = "Nouveau client connecté"
-                    }, clientId);
-
-                    _ = HandleClient(client, clientId);
+                    // On ne loggue plus la connexion ici, on attend l'identification
+                    _ = HandleClient(client);
                 }
                 catch (Exception ex)
                 {
@@ -44,20 +36,14 @@ namespace EasyServer
             }
         }
 
-        private static string GetClientId(TcpClient client)
-        {
-            if (client.Client.RemoteEndPoint is IPEndPoint ipEndPoint)
-            {
-                return ipEndPoint.Address.ToString();
-            }
-            return "Unknown-IP";
-        }
-
-        private static async Task HandleClient(TcpClient client, string clientId)
+        private static async Task HandleClient(TcpClient client)
         {
             var stream = client.GetStream();
             byte[] buffer = new byte[4096];
             string incompleteData = "";
+
+            string clientId = "En attente d'identification...";
+            bool isIdentified = false;
 
             try
             {
@@ -75,37 +61,57 @@ namespace EasyServer
                         string msg = incompleteData.Substring(0, newlineIndex).TrimEnd('\r');
                         incompleteData = incompleteData.Substring(newlineIndex + 1);
 
-                        if (msg.StartsWith("[LOG]|"))
+                        // Si le client n'a pas encore donné son nom, on cherche l'identification
+                        if (!isIdentified)
                         {
-                            var parts = msg.Split(new[] { '|' }, 4);
-                            if (parts.Length == 4)
+                            if (msg.StartsWith("[IDENTIFY]|"))
                             {
-                                string jobId = parts[1];
-                                string format = parts[2];
-                                string jsonPayload = parts[3];
+                                clientId = msg.Substring(11).Trim();
+                                isIdentified = true;
+                                Console.WriteLine($"[CONNEXION] Client identifié : {clientId}");
 
-                                _ = ServerLogger.Instance.WriteClientBackupLogAsync(jsonPayload, clientId, jobId, format);
+                                _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry
+                                {
+                                    Action = "CONNEXION",
+                                    Message = "Nouveau client connecté"
+                                }, clientId);
                             }
-                        }
-                        else if (msg.StartsWith("[STATE]|"))
-                        {
-                            var parts = msg.Split(new[] { '|' }, 2);
-                            if (parts.Length == 2)
-                            {
-                                string jsonPayload = parts[1];
-                                _ = ServerStateManager.Instance.WriteClientStateAsync(jsonPayload, clientId);
-                            }
-                        }
-                        else if (msg.StartsWith("[GET_STATES]"))
-                        {
-                            string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync();
-                            byte[] responseData = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
-                            try { await stream.WriteAsync(responseData, 0, responseData.Length); } catch { }
                         }
                         else
                         {
-                            Console.WriteLine($"[RECEPTION] [{clientId}] {msg}");
-                            Broadcast(msg, client);
+                            // Traitement normal une fois identifié
+                            if (msg.StartsWith("[LOG]|"))
+                            {
+                                var parts = msg.Split(new[] { '|' }, 4);
+                                if (parts.Length == 4)
+                                {
+                                    string jobId = parts[1];
+                                    string format = parts[2];
+                                    string jsonPayload = parts[3];
+
+                                    _ = ServerLogger.Instance.WriteClientBackupLogAsync(jsonPayload, clientId, jobId, format);
+                                }
+                            }
+                            else if (msg.StartsWith("[STATE]|"))
+                            {
+                                var parts = msg.Split(new[] { '|' }, 2);
+                                if (parts.Length == 2)
+                                {
+                                    string jsonPayload = parts[1];
+                                    _ = ServerStateManager.Instance.WriteClientStateAsync(jsonPayload, clientId);
+                                }
+                            }
+                            else if (msg.StartsWith("[GET_STATES]"))
+                            {
+                                string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync();
+                                byte[] responseData = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
+                                try { await stream.WriteAsync(responseData, 0, responseData.Length); } catch { }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"[RECEPTION] [{clientId}] {msg}");
+                                Broadcast(msg, client);
+                            }
                         }
                     }
                 }
@@ -117,13 +123,20 @@ namespace EasyServer
             finally
             {
                 lock (_lock) _clients.Remove(client);
-                Console.WriteLine($"[DECONNEXION] Le client {clientId} s'est déconnecté.");
 
-                _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry
+                if (isIdentified)
                 {
-                    Action = "DECONNEXION",
-                    Message = "Fin de la connexion"
-                }, clientId);
+                    Console.WriteLine($"[DECONNEXION] Le client {clientId} s'est déconnecté.");
+                    _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry
+                    {
+                        Action = "DECONNEXION",
+                        Message = "Fin de la connexion"
+                    }, clientId);
+                }
+                else
+                {
+                    Console.WriteLine("[DECONNEXION] Un client non identifié s'est déconnecté.");
+                }
 
                 client.Close();
             }
