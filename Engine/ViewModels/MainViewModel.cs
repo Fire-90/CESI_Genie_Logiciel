@@ -76,7 +76,7 @@ namespace EasySave.ViewModels
                 {
                     CurrentSettings.LogFormat = newValue;
                     OnPropertyChanged(nameof(SelectedLogFormat));
-                    SaveConfig(); // Sauvegarde automatique
+                    SaveConfig();
                 }
             }
         }
@@ -90,7 +90,7 @@ namespace EasySave.ViewModels
                 {
                     CurrentSettings.LogDestination = value;
                     OnPropertyChanged(nameof(SelectedLogDestination));
-                    SaveConfig(); // Sauvegarde automatique
+                    SaveConfig();
                 }
             }
         }
@@ -104,7 +104,7 @@ namespace EasySave.ViewModels
                 {
                     CurrentSettings.ServerIP = value;
                     OnPropertyChanged(nameof(ServerIP));
-                    SaveConfig(); // Sauvegarde automatique (LostFocus depuis l'UI)
+                    SaveConfig();
                 }
             }
         }
@@ -118,7 +118,7 @@ namespace EasySave.ViewModels
                 {
                     CurrentSettings.ClientName = value;
                     OnPropertyChanged(nameof(ClientName));
-                    SaveConfig(); // Sauvegarde automatique (LostFocus depuis l'UI)
+                    SaveConfig();
                 }
             }
         }
@@ -135,16 +135,9 @@ namespace EasySave.ViewModels
                                           .ToList();
                     CurrentSettings.EncryptedExtensions = extensions;
                     OnPropertyChanged(nameof(EncryptedExtensionsString));
-                    SaveConfig(); // Sauvegarde automatique (LostFocus depuis l'UI)
+                    SaveConfig();
                 }
             }
-        }
-
-        private bool _isSettingsOpen = false;
-        public bool IsSettingsOpen
-        {
-            get => _isSettingsOpen;
-            set { _isSettingsOpen = value; OnPropertyChanged(nameof(IsSettingsOpen)); }
         }
 
         private string _newSoftware;
@@ -156,26 +149,23 @@ namespace EasySave.ViewModels
 
         public string SelectedSoftware { get; set; }
 
-        // --- PROPRIÉTÉS POUR LES PROCESSUS ET LE RESEAU ---
-        private ObservableCollection<ProcessInfo> _processes;
-        public ObservableCollection<ProcessInfo> Processes
+        // --- STATUT DU RÉSEAU ---
+        private ConnectionStatus _currentConnectionStatus = ConnectionStatus.Disconnected;
+        private string _connectionStatusText = "Échec / Déconnecté";
+        public string ConnectionStatusText
         {
-            get => _processes;
-            set { _processes = value; OnPropertyChanged(nameof(Processes)); }
+            get => _connectionStatusText;
+            set { _connectionStatusText = value; OnPropertyChanged(nameof(ConnectionStatusText)); }
         }
 
-        private ProcessInfo _selectedProcess;
-        public ProcessInfo SelectedProcess
+        private string _connectionStatusColor = "#E74C3C"; // Rouge
+        public string ConnectionStatusColor
         {
-            get => _selectedProcess;
-            set
-            {
-                _selectedProcess = value;
-                OnPropertyChanged(nameof(SelectedProcess));
-                (StopProcessCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            }
+            get => _connectionStatusColor;
+            set { _connectionStatusColor = value; OnPropertyChanged(nameof(ConnectionStatusColor)); }
         }
 
+        // --- PROPRIÉTÉ POUR LE RÉSEAU (CLIENTS DISTANTS UNIQUEMENT) ---
         private ObservableCollection<RemoteClientState> _remoteStates;
         public ObservableCollection<RemoteClientState> RemoteStates
         {
@@ -188,10 +178,8 @@ namespace EasySave.ViewModels
         public ICommand ExecuteSelectionCommand { get; }
         public ICommand DeleteJobCommand { get; }
         public ICommand ChangeLanguageCommand { get; }
-        public ICommand ToggleSettingsCommand { get; }
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
-        public ICommand StopProcessCommand { get; }
         public ICommand RefreshProcessesCommand { get; }
 
         public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
@@ -212,7 +200,6 @@ namespace EasySave.ViewModels
             }
 
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
-            Processes = new ObservableCollection<ProcessInfo>();
             RemoteStates = new ObservableCollection<RemoteClientState>();
 
             _backupEngine.OnProgressUpdate += (file, remaining) =>
@@ -238,18 +225,53 @@ namespace EasySave.ViewModels
 
             _networkService.OnMessageReceived += HandleNetworkMessage;
 
+            // Écoute du changement d'état réseau
+            _networkService.OnConnectionStatusChanged += HandleConnectionStatusChanged;
+
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob, CanExecuteSelectedJob);
             DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
             ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
-            ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
             AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
-            StopProcessCommand = new RelayCommand(ExecuteStopProcess, CanStopProcess);
             RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
 
             ChangeLanguage(CurrentSettings.Language);
+
             ExecuteRefreshProcesses(null);
+        }
+
+        private void HandleConnectionStatusChanged(ConnectionStatus status)
+        {
+            _currentConnectionStatus = status;
+            UpdateConnectionStatusUI();
+        }
+
+        private void UpdateConnectionStatusUI()
+        {
+            Action updateUiAction = () =>
+            {
+                bool isEn = CurrentSettings.Language == "EN";
+
+                if (_currentConnectionStatus == ConnectionStatus.Connected)
+                {
+                    ConnectionStatusText = isEn ? "Connected" : "Connecté";
+                    ConnectionStatusColor = "#2ECC71"; // Vert
+                }
+                else if (_currentConnectionStatus == ConnectionStatus.Connecting)
+                {
+                    ConnectionStatusText = isEn ? "Connecting..." : "En cours...";
+                    ConnectionStatusColor = "#F39C12"; // Orange
+                }
+                else
+                {
+                    ConnectionStatusText = isEn ? "Failed / Disconnected" : "Échec / Déconnecté";
+                    ConnectionStatusColor = "#E74C3C"; // Rouge
+                }
+            };
+
+            if (_syncContext != null) _syncContext.Post(_ => updateUiAction(), null);
+            else updateUiAction();
         }
 
         private void HandleNetworkMessage(string message)
@@ -268,6 +290,8 @@ namespace EasySave.ViewModels
                         {
                             foreach (var kvp in dict)
                             {
+                                if (kvp.Key == CurrentSettings.ClientName) continue;
+
                                 var jobs = new ObservableCollection<ClientJobState>();
                                 try
                                 {
@@ -307,7 +331,8 @@ namespace EasySave.ViewModels
             string lang = param as string ?? "FR";
             CurrentSettings.Language = lang;
             LanguageService.CurrentLanguage = lang;
-            SaveConfig(); // Sauvegarde automatique
+            SaveConfig();
+            UpdateConnectionStatusUI(); // Met à jour la traduction du statut réseau
         }
 
         private void ExecuteAddJob(object parameter)
@@ -397,7 +422,7 @@ namespace EasySave.ViewModels
                 Softwares.Add(NewSoftware);
                 CurrentSettings.BusinessSoftwares = Softwares.ToList();
                 NewSoftware = "";
-                SaveConfig(); // Sauvegarde automatique
+                SaveConfig();
             }
         }
 
@@ -407,63 +432,18 @@ namespace EasySave.ViewModels
             {
                 Softwares.Remove(SelectedSoftware);
                 CurrentSettings.BusinessSoftwares = Softwares.ToList();
-                SaveConfig(); // Sauvegarde automatique
+                SaveConfig();
             }
         }
 
         private void ExecuteRefreshProcesses(object parameter)
         {
-            try
-            {
-                var runningProcesses = System.Diagnostics.Process.GetProcesses()
-                    .Select(p => new ProcessInfo { Id = p.Id, Name = p.ProcessName })
-                    .ToList();
-
-                Processes.Clear();
-                foreach (var process in runningProcesses) Processes.Add(process);
-
-                _networkService.SendMessage("[GET_STATES]");
-            }
-            catch (Exception ex)
-            {
-                CurrentFile = $"Erreur rafraîchissement : {ex.Message}";
-            }
-        }
-
-        private bool CanStopProcess(object parameter) => SelectedProcess != null;
-
-        private void ExecuteStopProcess(object parameter)
-        {
-            if (SelectedProcess == null) return;
-
-            try
-            {
-                var process = System.Diagnostics.Process.GetProcessById(SelectedProcess.Id);
-                process.Kill();
-                process.WaitForExit();
-                ExecuteRefreshProcesses(null);
-            }
-            catch (Exception ex)
-            {
-                CurrentFile = $"Erreur arrêt : {ex.Message}";
-            }
+            _networkService.SendMessage("[GET_STATES]");
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    public class ProcessInfo : INotifyPropertyChanged
-    {
-        private int _id;
-        public int Id { get => _id; set { _id = value; OnPropertyChanged(nameof(Id)); } }
-
-        private string _name;
-        public string Name { get => _name; set { _name = value; OnPropertyChanged(nameof(Name)); } }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     public class ClientJobState

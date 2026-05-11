@@ -107,9 +107,24 @@ namespace EasyServer
                                 byte[] responseData = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
                                 try { await stream.WriteAsync(responseData, 0, responseData.Length); } catch { }
                             }
+                            else if (msg.StartsWith("[START]"))
+                            {
+                                Console.WriteLine($"[STATUT] {clientId} a démarré : {msg.Replace("[START]", "").Trim()}");
+                                Broadcast(msg, client);
+                            }
+                            else if (msg.StartsWith("[END]"))
+                            {
+                                Console.WriteLine($"[STATUT] {clientId} a terminé : {msg.Replace("[END]", "").Trim()}");
+                                Broadcast(msg, client);
+                            }
+                            else if (msg.StartsWith("[ERROR]"))
+                            {
+                                Console.WriteLine($"[ERREUR] {clientId} : {msg.Replace("[ERROR]", "").Trim()}");
+                                Broadcast(msg, client);
+                            }
                             else
                             {
-                                Console.WriteLine($"[RECEPTION] [{clientId}] {msg}");
+                                // On diffuse les autres messages (ex: [PROGRESS]) silencieusement pour éviter le spam console
                                 Broadcast(msg, client);
                             }
                         }

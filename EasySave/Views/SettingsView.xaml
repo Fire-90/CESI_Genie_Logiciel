@@ -40,7 +40,12 @@
                         <DropShadowEffect BlurRadius="15" Opacity="0.05" ShadowDepth="2"/>
                     </Border.Effect>
                     <StackPanel>
-                        <TextBlock Text="🌐 Réseau" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20"/>
+                        <TextBlock Text="🌐 Réseau" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <TextBlock Text="Statut de connexion :" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,10,0"/>
+                            <TextBlock Text="{Binding ConnectionStatusText}" Foreground="{Binding ConnectionStatusColor}" FontWeight="Bold"/>
+                        </StackPanel>
 
                         <TextBlock Text="Nom du Client (Identifiant) :" FontWeight="SemiBold" Foreground="#7F8C8D" Margin="0,0,0,5"/>
                         <TextBox Text="{Binding ClientName, Mode=TwoWay}" Height="35" Padding="5" VerticalContentAlignment="Center" Margin="0,0,0,15"/>
