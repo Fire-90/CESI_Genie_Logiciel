@@ -20,7 +20,7 @@ namespace EasySave.Services
         private readonly ConfigManager _configManager;
         private readonly object _stateLock = new object();
 
-        // NOUVEAU : Dictionnaire pour stocker les événements de pause pour chaque tâche
+        private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellationTokens = new ConcurrentDictionary<string, CancellationTokenSource>();
         private readonly ConcurrentDictionary<string, ManualResetEvent> _jobPauseEvents = new ConcurrentDictionary<string, ManualResetEvent>();
 
         public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
@@ -29,22 +29,29 @@ namespace EasySave.Services
             _configManager = configManager;
         }
 
-        // NOUVEAU : Méthode pour mettre en pause
         public void PauseJob(string jobName)
         {
             if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent))
             {
-                pauseEvent.Reset(); // Ferme la barrière (met en pause)
+                pauseEvent.Reset();
             }
         }
 
-        // NOUVEAU : Méthode pour reprendre
         public void ResumeJob(string jobName)
         {
             if (_jobPauseEvents.TryGetValue(jobName, out var pauseEvent))
             {
-                pauseEvent.Set(); // Ouvre la barrière (relance)
+                pauseEvent.Set(); 
             }
+        }
+
+        public void StopJob(string jobName)
+        {
+            if (_jobCancellationTokens.TryGetValue(jobName, out var cts))
+            {
+                cts.Cancel();
+            }
+            ResumeJob(jobName);
         }
 
         private string GetRunningBusinessSoftware()
@@ -100,15 +107,18 @@ namespace EasySave.Services
                 });
             }
 
-            // NOUVEAU : Initialise l'événement de pause pour cette tâche (en position "Ouverte" / true)
             _jobPauseEvents[job.Name] = new ManualResetEvent(true);
+            var cts = new CancellationTokenSource();
+            _jobCancellationTokens[job.Name] = cts;
 
             try
             {
                 foreach (string file in allFiles)
                 {
-                    // NOUVEAU : C'est ici que la magie opère. 
-                    // Si l'utilisateur clique sur pause, le thread va se figer à cette ligne jusqu'à ce qu'il clique sur "Play".
+                    if (cts.Token.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException($"La sauvegarde {job.Name} a été annulée par l'utilisateur.");
+                    }
                     _jobPauseEvents[job.Name].WaitOne();
 
                     string currentBlockingSoftware = GetRunningBusinessSoftware();
@@ -173,11 +183,8 @@ namespace EasySave.Services
             }
             finally
             {
-                // NOUVEAU : Nettoyage de l'événement de pause pour libérer la mémoire à la fin de la sauvegarde
-                if (_jobPauseEvents.TryRemove(job.Name, out var pauseEvent))
-                {
-                    pauseEvent.Dispose();
-                }
+                if (_jobPauseEvents.TryRemove(job.Name, out var pauseEvent)) pauseEvent.Dispose();
+                if (_jobCancellationTokens.TryRemove(job.Name, out var tokenSource)) tokenSource.Dispose();
             }
         }
 
