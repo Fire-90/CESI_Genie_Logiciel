@@ -122,7 +122,7 @@ namespace EasySave.Services
         public string EncryptionKey { get; set; } = "EasySaveKey";
 
         public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();
-        public List<string> BusinessSoftwares { get; set; } = new List<string> { "calculator", "notepad" };
+        public List<string> BusinessSoftwares { get; set; } = new List<string> { "CalculatorApp", "notepad" };
         public List<string> EncryptedExtensions { get; set; } = new List<string> { ".txt", ".docx" };
         public List<string> PriorityExtensions { get; set; } = new List<string> { ".xml", ".txt" };
     }

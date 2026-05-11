@@ -15,53 +15,24 @@ namespace EasySave.ViewModels
         public string Name
         {
             get => Model.Name;
-            set
-            {
-                if (Model.Name != value)
-                {
-                    Model.Name = value;
-                    OnPropertyChanged(nameof(Name));
-                }
-            }
+            set { if (Model.Name != value) { Model.Name = value; OnPropertyChanged(nameof(Name)); } }
         }
         public string SourceDirectory
         {
             get => Model.SourceDirectory;
-            set
-            {
-                if (Model.SourceDirectory != value)
-                {
-                    Model.SourceDirectory = value;
-                    OnPropertyChanged(nameof(SourceDirectory));
-                }
-            }
+            set { if (Model.SourceDirectory != value) { Model.SourceDirectory = value; OnPropertyChanged(nameof(SourceDirectory)); } }
         }
         public string TargetDirectory
         {
             get => Model.TargetDirectory;
-            set
-            {
-                if (Model.TargetDirectory != value)
-                {
-                    Model.TargetDirectory = value;
-                    OnPropertyChanged(nameof(TargetDirectory));
-                }
-            }
+            set { if (Model.TargetDirectory != value) { Model.TargetDirectory = value; OnPropertyChanged(nameof(TargetDirectory)); } }
         }
         public BackupType Type
         {
             get => Model.Type;
-            set
-            {
-                if (Model.Type != value)
-                {
-                    Model.Type = value;
-                    OnPropertyChanged(nameof(Type));
-                }
-            }
+            set { if (Model.Type != value) { Model.Type = value; OnPropertyChanged(nameof(Type)); } }
         }
 
-        // Multithreading UI properties
         private bool _isSelected;
         public bool IsSelected
         {
@@ -97,11 +68,20 @@ namespace EasySave.ViewModels
             set { _isBlocked = value; OnPropertyChanged(nameof(IsBlocked)); }
         }
 
+        // PAUSE MANUELLE (Utilisateur)
         private bool _isPaused;
         public bool IsPaused
         {
             get => _isPaused;
             set { _isPaused = value; OnPropertyChanged(nameof(IsPaused)); }
+        }
+
+        // PAUSE AUTOMATIQUE (Logiciel métier)
+        private bool _isSoftwareSuspended;
+        public bool IsSoftwareSuspended
+        {
+            get => _isSoftwareSuspended;
+            set { _isSoftwareSuspended = value; OnPropertyChanged(nameof(IsSoftwareSuspended)); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

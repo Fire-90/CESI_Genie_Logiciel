@@ -19,39 +19,22 @@ namespace EasySave.ViewModels
         private readonly SynchronizationContext _uiContext;
 
         public LanguageService LanguageService { get; }
-
         public ObservableCollection<JobViewModel> Jobs { get; }
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
-
         public bool IsJobSelected => SelectedJob != null;
 
         private JobViewModel _selectedJob;
         public JobViewModel SelectedJob
         {
             get => _selectedJob;
-            set
-            {
-                if (_selectedJob != value)
-                {
-                    _selectedJob = value;
-                    OnPropertyChanged(nameof(SelectedJob));
-                    OnPropertyChanged(nameof(IsJobSelected));
-                }
-            }
+            set { if (_selectedJob != value) { _selectedJob = value; OnPropertyChanged(nameof(SelectedJob)); OnPropertyChanged(nameof(IsJobSelected)); } }
         }
 
         private string _currentFile;
         public string CurrentFile
         {
             get => _currentFile;
-            private set
-            {
-                if (_currentFile != value)
-                {
-                    _currentFile = value;
-                    OnPropertyChanged(nameof(CurrentFile));
-                }
-            }
+            private set { if (_currentFile != value) { _currentFile = value; OnPropertyChanged(nameof(CurrentFile)); } }
         }
 
         public ICommand AddJobCommand { get; }
@@ -71,7 +54,6 @@ namespace EasySave.ViewModels
 
             var settings = _configManager.LoadSettings();
             Jobs = new ObservableCollection<JobViewModel>(settings.Jobs.Select(j => new JobViewModel(j)));
-
             foreach (var job in Jobs) job.PropertyChanged += OnJobPropertyChanged;
 
             AddJobCommand = new RelayCommand(ExecuteAddJob);
@@ -86,186 +68,57 @@ namespace EasySave.ViewModels
 
         private void RegisterEngineEvents()
         {
-            _backupEngine.OnProgressUpdate += (file, remaining) =>
-            {
-                if (_uiContext != null) _uiContext.Post(_ => CurrentFile = file, null);
-                else CurrentFile = file;
-                _networkService.SendMessage($"[PROGRESS] {file}");
-            };
+            _backupEngine.OnProgressUpdate += (file, remaining) => { if (_uiContext != null) _uiContext.Post(_ => CurrentFile = file, null); else CurrentFile = file; };
+            _backupEngine.OnActivityMessage += (message) => { Action updateMsg = () => CurrentFile = message; if (_uiContext != null) _uiContext.Post(_ => updateMsg(), null); else updateMsg(); };
 
-            _backupEngine.OnActivityMessage += (message) =>
+            _backupEngine.OnJobSuspendedBySoftware += (jobName, isSuspended, software) =>
             {
-                Action updateMsg = () => CurrentFile = message;
-                if (_uiContext != null) _uiContext.Post(_ => updateMsg(), null);
-                else updateMsg();
-
-                _networkService.SendMessage($"[PROGRESS] {message}");
-            };
-
-            _backupEngine.OnJobWaiting += (jobName, isWaiting) =>
-            {
-                Action updateWait = () =>
+                Action updateUI = () =>
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
-                    if (jobVm != null) jobVm.IsWaiting = isWaiting;
+                    if (jobVm != null) jobVm.IsSoftwareSuspended = isSuspended;
                 };
-
-                if (_uiContext != null) _uiContext.Post(_ => updateWait(), null);
-                else updateWait();
+                if (_uiContext != null) _uiContext.Post(_ => updateUI(), null); else updateUI();
             };
 
-            _backupEngine.OnJobBlocked += (jobName, isBlocked) =>
-            {
-                Action updateBlock = () =>
-                {
-                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
-                    if (jobVm != null) jobVm.IsBlocked = isBlocked;
-                };
-
-                if (_uiContext != null) _uiContext.Post(_ => updateBlock(), null);
-                else updateBlock();
-            };
-
-            _backupEngine.OnJobProgress += (jobName, progress) =>
-            {
-                Action updateProgress = () =>
-                {
-                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
-                    if (jobVm != null)
-                    {
-                        jobVm.Progress = progress;
-                        if (progress >= 100)
-                        {
-                            Task.Run(async () =>
-                            {
-                                await Task.Delay(1500);
-                                if (_uiContext != null) _uiContext.Post(_ => jobVm.Progress = 0, null);
-                                else jobVm.Progress = 0;
-                            });
-                        }
-                    }
-                };
-
-                if (_uiContext != null) _uiContext.Post(_ => updateProgress(), null);
-                else updateProgress();
-            };
+            _backupEngine.OnJobWaiting += (jobName, isWaiting) => { Action updateWait = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) jobVm.IsWaiting = isWaiting; }; if (_uiContext != null) _uiContext.Post(_ => updateWait(), null); else updateWait(); };
+            _backupEngine.OnJobBlocked += (jobName, isBlocked) => { Action updateBlock = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) jobVm.IsBlocked = isBlocked; }; if (_uiContext != null) _uiContext.Post(_ => updateBlock(), null); else updateBlock(); };
+            _backupEngine.OnJobProgress += (jobName, progress) => { Action updateProgress = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) { jobVm.Progress = progress; if (progress >= 100) Task.Run(async () => { await Task.Delay(1500); if (_uiContext != null) _uiContext.Post(_ => jobVm.Progress = 0, null); else jobVm.Progress = 0; }); } }; if (_uiContext != null) _uiContext.Post(_ => updateProgress(), null); else updateProgress(); };
         }
 
         private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" ||
-                e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" ||
-                e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked") return;
-
+            if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" || e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked" || e.PropertyName == "IsSoftwareSuspended") return;
             SaveConfig();
         }
 
-        public void SaveConfig()
-        {
-            var settings = _configManager.LoadSettings();
-            settings.Jobs = Jobs.Select(j => j.Model).ToList();
-            _configManager.SaveSettings(settings);
-        }
-
-        private void ExecuteAddJob(object parameter)
-        {
-            int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1;
-            var newModel = new BackupJob { Id = newId, Name = $"Save {newId}", SourceDirectory = "", TargetDirectory = "", Type = BackupType.Full };
-            var newViewModel = new JobViewModel(newModel);
-            newViewModel.PropertyChanged += OnJobPropertyChanged;
-            Jobs.Add(newViewModel);
-            SaveConfig();
-            SelectedJob = newViewModel;
-            CurrentFile = LanguageService["MsgSlotAdded"];
-        }
-
-        private void ExecuteDeleteJob(object parameter)
-        {
-            if (SelectedJob != null)
-            {
-                SelectedJob.PropertyChanged -= OnJobPropertyChanged;
-                Jobs.Remove(SelectedJob);
-                SaveConfig();
-                CurrentFile = LanguageService["MsgDeleted"];
-                SelectedJob = null;
-            }
-        }
-
-        private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
+        public void SaveConfig() { var settings = _configManager.LoadSettings(); settings.Jobs = Jobs.Select(j => j.Model).ToList(); _configManager.SaveSettings(settings); }
 
         private async void ExecuteSelectedJob(object parameter)
         {
             var jobsToRun = Jobs.Where(j => j.IsSelected).ToList();
-            if (!jobsToRun.Any())
-            {
-                CurrentFile = LanguageService["MsgEmptyPath"];
-                return;
-            }
+            if (!jobsToRun.Any()) { CurrentFile = LanguageService["MsgEmptyPath"]; return; }
 
             try
             {
                 CurrentFile = LanguageService["MsgStartGlobal"];
-                var tasks = new List<Task>();
-
                 foreach (var jobVm in jobsToRun)
                 {
                     if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
-
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
-                    jobVm.IsWaiting = false;
-                    jobVm.IsBlocked = false;
+                    jobVm.IsPaused = false;
+                    jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
 
-                    var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
-                    if (propertyInfo != null && propertyInfo.CanWrite) propertyInfo.SetValue(jobVm, false);
-
-                    _networkService.SendMessage($"[START] {jobVm.Name}");
-
-                    tasks.Add(Task.Run(async () =>
+                    _ = Task.Run(async () =>
                     {
-                        try
-                        {
-                            await _backupEngine.ExecuteJobAsync(jobVm.Model);
-                            _networkService.SendMessage($"[END] {jobVm.Name}");
-                        }
-                        catch (Exception ex)
-                        {
-                            if (ex.Message == "Job stopped manually.")
-                            {
-                                if (_uiContext != null) _uiContext.Post(_ => CurrentFile = LanguageService["MsgJobStopped"], null);
-                                _networkService.SendMessage($"[STOPPED] {jobVm.Name}");
-                            }
-                            else
-                            {
-                                if (_uiContext != null) _uiContext.Post(_ => CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}", null);
-                                _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
-                            }
-                        }
-                        finally
-                        {
-                            Action resetAction = () =>
-                            {
-                                jobVm.IsRunning = false;
-                                jobVm.IsWaiting = false;
-                                jobVm.IsBlocked = false;
-                                if (jobVm.Progress < 100) jobVm.Progress = 0;
-                            };
-
-                            if (_uiContext != null) _uiContext.Post(_ => resetAction(), null);
-                            else resetAction();
-                        }
-                    }));
-                }
-                await Task.WhenAll(tasks);
-                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped") && !CurrentFile.Contains("[BLOQUÉ]"))
-                {
-                    CurrentFile = LanguageService["MsgSuccessGlobal"];
+                        try { await _backupEngine.ExecuteJobAsync(jobVm.Model); }
+                        catch (Exception ex) { if (ex.Message == "Job stopped manually.") _uiContext?.Post(_ => CurrentFile = LanguageService["MsgJobStopped"], null); else _uiContext?.Post(_ => CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}", null); }
+                        finally { Action reset = () => { jobVm.IsRunning = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = false; if (jobVm.Progress < 100) jobVm.Progress = 0; }; if (_uiContext != null) _uiContext.Post(_ => reset(), null); else reset(); }
+                    });
                 }
             }
-            catch (Exception ex)
-            {
-                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
-            }
+            catch (Exception ex) { CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}"; }
         }
 
         public async Task ExecuteJobsAsync(List<int> ids)
@@ -280,104 +133,38 @@ namespace EasySave.ViewModels
 
                     jobVm.Progress = 0;
                     jobVm.IsRunning = true;
-                    jobVm.IsWaiting = false;
-                    jobVm.IsBlocked = false;
+                    jobVm.IsPaused = false;
+                    jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
 
-                    var propertyInfo = jobVm.GetType().GetProperty("IsPaused");
-                    if (propertyInfo != null && propertyInfo.CanWrite)
-                    {
-                        propertyInfo.SetValue(jobVm, false);
-                    }
-
-                    _networkService.SendMessage($"[START] {jobVm.Name}");
-                    try
-                    {
-                        await _backupEngine.ExecuteJobAsync(jobVm.Model);
-                        _networkService.SendMessage($"[END] {jobVm.Name}");
-                    }
-                    catch (Exception ex)
-                    {
-                        if (ex.Message == "Job stopped manually.")
-                        {
-                            if (_uiContext != null) _uiContext.Post(_ => CurrentFile = LanguageService["MsgJobStopped"], null);
-                            _networkService.SendMessage($"[STOPPED] {jobVm.Name}");
-                        }
-                        else
-                        {
-                            if (_uiContext != null) _uiContext.Post(_ => CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}", null);
-                            _networkService.SendMessage($"[ERROR] {jobVm.Name} : {ex.Message}");
-                        }
-                    }
-                    finally
-                    {
-                        Action resetAction = () =>
-                        {
-                            jobVm.IsRunning = false;
-                            jobVm.IsWaiting = false;
-                            jobVm.IsBlocked = false;
-                            if (jobVm.Progress < 100) jobVm.Progress = 0;
-                        };
-
-                        if (_uiContext != null) _uiContext.Post(_ => resetAction(), null);
-                        else resetAction();
-                    }
-                }
-
-                if (!CurrentFile.Contains("❌") && !CurrentFile.Contains("interrompue") && !CurrentFile.Contains("stopped") && !CurrentFile.Contains("[BLOQUÉ]"))
-                {
-                    CurrentFile = LanguageService["MsgSuccessGlobal"];
+                    try { await _backupEngine.ExecuteJobAsync(jobVm.Model); }
+                    catch (Exception ex) { string msg = ex.Message == "Job stopped manually." ? LanguageService["MsgJobStopped"] : $"{LanguageService["MsgError"]} {ex.Message}"; CurrentFile = msg; }
+                    finally { jobVm.IsRunning = false; jobVm.IsWaiting = false; jobVm.IsBlocked = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = false; if (jobVm.Progress < 100) jobVm.Progress = 0; }
                 }
             }
-            catch (Exception ex)
-            {
-                CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}";
-            }
+            catch (Exception ex) { CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}"; }
         }
 
-        private void ExecutePauseJob(object parameter)
-        {
-            if (parameter is JobViewModel job)
-            {
-                _backupEngine.PauseJob(job.Name);
-
-                var propertyInfo = job.GetType().GetProperty("IsPaused");
-                if (propertyInfo != null && propertyInfo.CanWrite)
-                {
-                    propertyInfo.SetValue(job, true);
-                }
-            }
-        }
+        private void ExecutePauseJob(object parameter) { if (parameter is JobViewModel job) { _backupEngine.PauseJob(job.Name); job.IsPaused = true; } }
 
         private void ExecuteResumeJob(object parameter)
         {
             if (parameter is JobViewModel job)
             {
+                string blocking = _backupEngine.GetRunningBusinessSoftware();
+                if (blocking != null)
+                {
+                    CurrentFile = LanguageService["MsgBlockingSoftware"] + " " + blocking;
+                    return;
+                }
                 _backupEngine.ResumeJob(job.Name);
-
-                var propertyInfo = job.GetType().GetProperty("IsPaused");
-                if (propertyInfo != null && propertyInfo.CanWrite)
-                {
-                    propertyInfo.SetValue(job, false);
-                }
+                job.IsPaused = false;
             }
         }
 
-        private void ExecuteStopJob(object parameter)
-        {
-            if (parameter is JobViewModel job)
-            {
-                _backupEngine.StopJob(job.Name);
-                job.IsRunning = false;
-                job.IsWaiting = false;
-                job.IsBlocked = false;
-
-                var propertyInfo = job.GetType().GetProperty("IsPaused");
-                if (propertyInfo != null && propertyInfo.CanWrite)
-                {
-                    propertyInfo.SetValue(job, false);
-                }
-            }
-        }
+        private void ExecuteStopJob(object parameter) { if (parameter is JobViewModel job) { _backupEngine.StopJob(job.Name); } }
+        private void ExecuteAddJob(object parameter) { int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1; var newViewModel = new JobViewModel(new BackupJob { Id = newId, Name = $"Save {newId}", SourceDirectory = "", TargetDirectory = "", Type = BackupType.Full }); newViewModel.PropertyChanged += OnJobPropertyChanged; Jobs.Add(newViewModel); SaveConfig(); SelectedJob = newViewModel; }
+        private void ExecuteDeleteJob(object parameter) { if (SelectedJob != null) { SelectedJob.PropertyChanged -= OnJobPropertyChanged; Jobs.Remove(SelectedJob); SaveConfig(); SelectedJob = null; } }
+        private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

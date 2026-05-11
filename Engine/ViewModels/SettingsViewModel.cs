@@ -11,7 +11,7 @@ namespace EasySave.ViewModels
     public class SettingsViewModel : INotifyPropertyChanged
     {
         private readonly ConfigManager _configManager;
-        private readonly JobManagementViewModel _jobVM; // Permet de synchroniser la liste des jobs lors du changement de langue
+        private readonly JobManagementViewModel _jobVM;
 
         public LanguageService LanguageService { get; }
 
@@ -146,9 +146,17 @@ namespace EasySave.ViewModels
             get => CurrentSettings?.EncryptedExtensions == null ? "" : string.Join(";", CurrentSettings.EncryptedExtensions);
             set
             {
-                if (CurrentSettings != null)
+                if (CurrentSettings != null && value != null)
                 {
-                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim()).ToList();
+                    // Correction : On traite les points comme des séparateurs pour gérer les oublis de ";" (ex: .txt.pdf)
+                    var extensions = value.Replace(".", ";.")
+                                          .Split(new[] { ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                          .Select(e => e.Trim())
+                                          .Where(e => !string.IsNullOrWhiteSpace(e) && e != ".")
+                                          .Select(e => e.StartsWith(".") ? e : "." + e)
+                                          .Distinct()
+                                          .ToList();
+
                     CurrentSettings.EncryptedExtensions = extensions;
                     OnPropertyChanged(nameof(EncryptedExtensionsString));
                     SaveConfig();
@@ -161,9 +169,17 @@ namespace EasySave.ViewModels
             get => CurrentSettings?.PriorityExtensions == null ? "" : string.Join(";", CurrentSettings.PriorityExtensions);
             set
             {
-                if (CurrentSettings != null)
+                if (CurrentSettings != null && value != null)
                 {
-                    var extensions = value.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim()).ToList();
+                    // Correction : On traite les points comme des séparateurs pour gérer les oublis de ";" (ex: .txt.pdf)
+                    var extensions = value.Replace(".", ";.")
+                                          .Split(new[] { ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                          .Select(e => e.Trim())
+                                          .Where(e => !string.IsNullOrWhiteSpace(e) && e != ".")
+                                          .Select(e => e.StartsWith(".") ? e : "." + e)
+                                          .Distinct()
+                                          .ToList();
+
                     CurrentSettings.PriorityExtensions = extensions;
                     OnPropertyChanged(nameof(PriorityExtensionsString));
                     SaveConfig();
