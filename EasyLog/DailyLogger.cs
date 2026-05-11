@@ -49,8 +49,11 @@ namespace EasyLog
             _settingsFilePath = Path.Combine(exePath, "Data", "settings.json");
         }
 
-        private string GetCurrentLogFormat()
+        // Récupère à la fois le format et la destination des logs
+        private (string format, string destination) GetLogSettings()
         {
+            string format = "json";
+            string destination = "LocalAndServer";
             try
             {
                 if (File.Exists(_settingsFilePath))
@@ -60,41 +63,55 @@ namespace EasyLog
                     {
                         if (doc.RootElement.TryGetProperty("LogFormat", out JsonElement formatElement))
                         {
-                            return formatElement.GetString() ?? "json";
+                            format = formatElement.GetString() ?? "json";
+                        }
+                        if (doc.RootElement.TryGetProperty("LogDestination", out JsonElement destElement))
+                        {
+                            destination = destElement.GetString() ?? "LocalAndServer";
                         }
                     }
                 }
             }
             catch { }
-            return "json";
+            return (format, destination);
         }
 
         public async Task WriteLogAsync(LogEntry entry, string jobId, string logFormat = null)
         {
-            string currentFormat = logFormat ?? GetCurrentLogFormat();
+            var settings = GetLogSettings();
+            string currentFormat = logFormat ?? settings.format;
+            string destination = settings.destination;
 
-            // Le chemin cible pointe désormais toujours vers le dossier "logs" global
             string logDirectory = Path.Combine(_baseDataDirectory, "logs");
 
-            lock (_lockObj)
+            // --- SAUVEGARDE LOCALE ---
+            if (destination.Equals("LocalOnly", StringComparison.OrdinalIgnoreCase) ||
+                destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
             {
-                if (!Directory.Exists(logDirectory))
+                lock (_lockObj)
                 {
-                    Directory.CreateDirectory(logDirectory);
-                }
+                    if (!Directory.Exists(logDirectory))
+                    {
+                        Directory.CreateDirectory(logDirectory);
+                    }
 
-                if (currentFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
-                {
-                    WriteXmlLog(entry, logDirectory);
-                }
-                else
-                {
-                    WriteJsonLog(entry, logDirectory);
+                    if (currentFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
+                    {
+                        WriteXmlLog(entry, logDirectory);
+                    }
+                    else
+                    {
+                        WriteJsonLog(entry, logDirectory);
+                    }
                 }
             }
 
-            // Avertissement pour la transmission réseau (le jobId est conservé pour le serveur)
-            OnLogGenerated?.Invoke(jobId, currentFormat, entry);
+            // --- ENVOI AU SERVEUR (Via Événement) ---
+            if (destination.Equals("ServerOnly", StringComparison.OrdinalIgnoreCase) ||
+                destination.Equals("LocalAndServer", StringComparison.OrdinalIgnoreCase))
+            {
+                OnLogGenerated?.Invoke(jobId, currentFormat, entry);
+            }
 
             await Task.CompletedTask;
         }

@@ -8,7 +8,7 @@
             </Border.Effect>
 
             <StackPanel>
-                <TextBlock Text="{Binding UIStrings[Settings]}" FontSize="28" FontWeight="Bold" Margin="0,0,0,30" Foreground="#2C3E50"/>
+                <TextBlock Text="{Binding LanguageService[Settings]}" FontSize="28" FontWeight="Bold" Margin="0,0,0,30" Foreground="#2C3E50"/>
 
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -24,22 +24,22 @@
                             <Button Content="FR" Command="{Binding ChangeLanguageCommand}" CommandParameter="FR" Width="60" Height="35"/>
                         </StackPanel>
 
-                        <TextBlock Text="{Binding UIStrings[LblLogFormat]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding LanguageService[LblLogFormat]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
                         <ComboBox ItemsSource="{Binding AvailableLogFormats}" SelectedItem="{Binding SelectedLogFormat}" Height="35" Margin="0,0,0,25"/>
 
-                        <TextBlock Text="{Binding UIStrings[LblEncryptedExt]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding LanguageService[LblEncryptedExt]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
                         <TextBox Text="{Binding EncryptedExtensionsString}" Height="35"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="{Binding UIStrings[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding LanguageService[Softwares]}" FontWeight="SemiBold" Margin="0,0,0,8"/>
                         <ListBox ItemsSource="{Binding Softwares}" Height="130" Margin="0,0,0,10"/>
-                        <Button Content="{Binding UIStrings[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" HorizontalAlignment="Right"/>
+                        <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding RemoveSoftwareCommand}" HorizontalAlignment="Right"/>
                     </StackPanel>
                 </Grid>
 
                 <Separator Margin="0,30,0,20"/>
-                <Button Content="{Binding UIStrings[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Background="#2ECC71" Foreground="White" Padding="30,12" HorizontalAlignment="Right"/>
+                <Button Content="{Binding LanguageService[SaveSettings]}" Command="{Binding SaveSettingsCommand}" Background="#2ECC71" Foreground="White" Padding="30,12" HorizontalAlignment="Right"/>
             </StackPanel>
         </Border>
     </Grid>
