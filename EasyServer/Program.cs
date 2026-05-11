@@ -1,5 +1,4 @@
-﻿using EasyServer;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -70,7 +69,6 @@ namespace EasyServer
                     string receivedChunk = Encoding.UTF8.GetString(buffer, 0, read);
                     incompleteData += receivedChunk;
 
-                    // Découpage propre des messages à l'aide du délimiteur \n
                     int newlineIndex;
                     while ((newlineIndex = incompleteData.IndexOf('\n')) >= 0)
                     {
@@ -87,6 +85,15 @@ namespace EasyServer
                                 string jsonPayload = parts[3];
 
                                 _ = ServerLogger.Instance.WriteClientBackupLogAsync(jsonPayload, clientId, jobId, format);
+                            }
+                        }
+                        else if (msg.StartsWith("[STATE]|"))
+                        {
+                            var parts = msg.Split(new[] { '|' }, 2);
+                            if (parts.Length == 2)
+                            {
+                                string jsonPayload = parts[1];
+                                _ = ServerStateManager.Instance.WriteClientStateAsync(jsonPayload, clientId);
                             }
                         }
                         else
