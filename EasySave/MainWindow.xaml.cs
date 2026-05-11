@@ -22,7 +22,7 @@ namespace Graphic
             var engine = new BackupEngine(stateTracker, configManager);
 
             // Initialisation du service réseau
-            var networkService = new NetworkService();
+            var networkService = new NetworkService(configManager);
 
             // 2. Création du ViewModel avec injection du service réseau
             _mainViewModel = new MainViewModel(configManager, stateTracker, engine, networkService);

@@ -11,9 +11,10 @@ namespace EasySave.Services
         private readonly string _ipAddress;
         private readonly int _port;
 
-        public NetworkService(string ipAddress = "10.144.128.51", int port = 11000)
+        public NetworkService(ConfigManager configManager, int port = 11000)
         {
-            _ipAddress = ipAddress;
+            var settings = configManager.LoadSettings();
+            _ipAddress = string.IsNullOrWhiteSpace(settings.ServerIP) ? "127.0.0.1" : settings.ServerIP;
             _port = port;
             StartConnectionLoop();
         }
