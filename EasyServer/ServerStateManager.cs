@@ -50,7 +50,7 @@ namespace EasyServer
             await Task.CompletedTask;
         }
 
-        public async Task<string> GetAllClientStatesAsync(string excludeClientId)
+        public async Task<string> GetAllClientStatesAsync(string excludeClientId, List<string> activeClientIds)
         {
             var states = new Dictionary<string, object>();
 
@@ -60,8 +60,8 @@ namespace EasyServer
                 {
                     string clientId = Path.GetFileName(dir);
 
-                    // ON EXCLUT L'UTILISATEUR QUI FAIT LA REQUÊTE
-                    if (clientId == excludeClientId) continue;
+                    // ON EXCLUT L'UTILISATEUR QUI FAIT LA REQUÊTE ET LES UTILISATEURS DÉCONNECTÉS
+                    if (clientId == excludeClientId || !activeClientIds.Contains(clientId)) continue;
 
                     string statePath = Path.Combine(dir, "state.json");
 

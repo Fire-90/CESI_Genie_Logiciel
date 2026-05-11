@@ -52,9 +52,9 @@
 
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#F8F9FA" CornerRadius="8" Padding="15" Margin="0,0,15,15" BorderBrush="#E0E0E0" BorderThickness="1" Width="140">
+                                            <Border Background="#F8F9FA" CornerRadius="8" Padding="15" Margin="0,0,15,15" BorderBrush="#E0E0E0" BorderThickness="1" Width="150">
                                                 <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="15" Foreground="#34495E" HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="15" Foreground="#34495E" HorizontalAlignment="Center" Margin="0,0,0,5" TextWrapping="Wrap" TextAlignment="Center"/>
 
                                                     <TextBlock Text="{Binding State}" Foreground="#7F8C8D" FontWeight="SemiBold" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10"/>
 
@@ -64,9 +64,13 @@
                                                         <Run Text="{Binding Progression, StringFormat={}{0:F0}%}"/>
                                                     </TextBlock>
 
-                                                    <TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center">
+                                                    <TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10">
                                                         <Run Text="{Binding NbFilesLeftToDo}"/>
                                                         <Run Text=" restants"/>
+                                                    </TextBlock>
+
+                                                    <TextBlock Foreground="#BDC3C7" FontSize="10" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap">
+                                                        <Run Text="{Binding LastActionDate}"/>
                                                     </TextBlock>
                                                 </StackPanel>
                                             </Border>

@@ -10,26 +10,16 @@ namespace EasySave.Services
 {
     public class JobStateInfo
     {
-        [JsonPropertyName("Name")]
-        public string Name { get; set; }
-        [JsonPropertyName("SourceFilePath")]
-        public string SourceFilePath { get; set; }
-        [JsonPropertyName("TargetFilePath")]
-        public string TargetFilePath { get; set; }
-        [JsonPropertyName("State")]
-        public string State { get; set; }
-        [JsonPropertyName("TotalFilesToCopy")]
-        public int TotalFilesToCopy { get; set; }
-        [JsonPropertyName("TotalFilesSize")]
-        public long TotalFilesSize { get; set; }
-        [JsonPropertyName("NbFilesLeftToDo")]
-        public int NbFilesLeftToDo { get; set; }
-        [JsonPropertyName("Progression")]
-        public int Progression { get; set; }
-        [JsonPropertyName("LastActionDate")]
-        public string LastActionDate { get; set; }
-        [JsonPropertyName("RemainingFilesSize")]
-        public long RemainingFilesSize { get; set; }
+        [JsonPropertyName("Name")] public string Name { get; set; }
+        [JsonPropertyName("SourceFilePath")] public string SourceFilePath { get; set; }
+        [JsonPropertyName("TargetFilePath")] public string TargetFilePath { get; set; }
+        [JsonPropertyName("State")] public string State { get; set; }
+        [JsonPropertyName("TotalFilesToCopy")] public int TotalFilesToCopy { get; set; }
+        [JsonPropertyName("TotalFilesSize")] public long TotalFilesSize { get; set; }
+        [JsonPropertyName("NbFilesLeftToDo")] public int NbFilesLeftToDo { get; set; }
+        [JsonPropertyName("Progression")] public int Progression { get; set; }
+        [JsonPropertyName("LastActionDate")] public string LastActionDate { get; set; }
+        [JsonPropertyName("RemainingFilesSize")] public long RemainingFilesSize { get; set; }
     }
 
     public class StateTracker
@@ -38,7 +28,6 @@ namespace EasySave.Services
         private static readonly object _lockObj = new object();
         private List<JobStateInfo> _currentStates;
 
-        // Événement déclenché à chaque mise à jour du fichier state.json
         public static event Action<string> OnStateUpdated;
 
         public StateTracker(List<BackupJob> configuredJobs)
@@ -60,7 +49,7 @@ namespace EasySave.Services
                     Name = job.Name,
                     SourceFilePath = "",
                     TargetFilePath = "",
-                    State = "END",
+                    State = "INACTIVE", // Par défaut
                     TotalFilesToCopy = 0,
                     TotalFilesSize = 0,
                     NbFilesLeftToDo = 0,
@@ -80,6 +69,15 @@ namespace EasySave.Services
                 if (state != null)
                 {
                     updateAction(state);
+
+                    // INTERCEPTION : Transforme la fin d'une tâche en INACTIVE
+                    if (state.State == "END")
+                    {
+                        state.State = "INACTIVE";
+                        state.Progression = 0;
+                        state.NbFilesLeftToDo = 0;
+                    }
+
                     state.LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                     WriteAllStates();
                 }
@@ -99,14 +97,12 @@ namespace EasySave.Services
             }
         }
 
-        // Nouvelle méthode pour forcer l'envoi de l'état (utile lors de la connexion réseau)
         public void BroadcastState()
         {
             lock (_lockObj)
             {
                 if (_currentStates != null)
                 {
-                    // JSON compact sur 1 seule ligne pour ne pas casser le lecteur TCP du serveur
                     string compactJson = JsonSerializer.Serialize(_currentStates);
                     OnStateUpdated?.Invoke(compactJson);
                 }
@@ -115,12 +111,10 @@ namespace EasySave.Services
 
         private void WriteAllStates()
         {
-            // 1. Sauvegarde locale AVEC sauts de ligne (lisible pour l'humain)
             var options = new JsonSerializerOptions { WriteIndented = true };
             string indentedJson = JsonSerializer.Serialize(_currentStates, options);
             File.WriteAllText(_stateFilePath, indentedJson);
 
-            // 2. Envoi réseau SANS sauts de ligne (pour que le serveur comprenne le message)
             string compactJson = JsonSerializer.Serialize(_currentStates);
             OnStateUpdated?.Invoke(compactJson);
         }

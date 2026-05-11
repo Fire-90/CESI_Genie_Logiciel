@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -10,7 +11,7 @@ namespace EasyServer
     class Program
     {
         private static TcpListener _listener;
-        private static readonly List<TcpClient> _clients = new List<TcpClient>();
+        private static readonly Dictionary<TcpClient, string> _clients = new Dictionary<TcpClient, string>();
         private static readonly object _lock = new object();
 
         static async Task Main(string[] args)
@@ -24,9 +25,11 @@ namespace EasyServer
                 try
                 {
                     TcpClient client = await _listener.AcceptTcpClientAsync();
-                    lock (_lock) _clients.Add(client);
+                    lock (_lock)
+                    {
+                        _clients.Add(client, string.Empty);
+                    }
 
-                    // On ne loggue plus la connexion ici, on attend l'identification
                     _ = HandleClient(client);
                 }
                 catch (Exception ex)
@@ -61,13 +64,18 @@ namespace EasyServer
                         string msg = incompleteData.Substring(0, newlineIndex).TrimEnd('\r');
                         incompleteData = incompleteData.Substring(newlineIndex + 1);
 
-                        // Si le client n'a pas encore donné son nom, on cherche l'identification
                         if (!isIdentified)
                         {
                             if (msg.StartsWith("[IDENTIFY]|"))
                             {
                                 clientId = msg.Substring(11).Trim();
                                 isIdentified = true;
+
+                                lock (_lock)
+                                {
+                                    _clients[client] = clientId;
+                                }
+
                                 Console.WriteLine($"[CONNEXION] Client identifié : {clientId}");
 
                                 _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry
@@ -79,7 +87,6 @@ namespace EasyServer
                         }
                         else
                         {
-                            // Traitement normal une fois identifié
                             if (msg.StartsWith("[LOG]|"))
                             {
                                 var parts = msg.Split(new[] { '|' }, 4);
@@ -103,18 +110,27 @@ namespace EasyServer
                             }
                             else if (msg.StartsWith("[GET_STATES]"))
                             {
-                                string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync(clientId);
+                                List<string> activeClientIds;
+                                lock (_lock)
+                                {
+                                    activeClientIds = _clients.Values.Where(id => !string.IsNullOrEmpty(id)).ToList();
+                                }
+
+                                string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync(clientId, activeClientIds);
                                 byte[] responseData = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
                                 try { await stream.WriteAsync(responseData, 0, responseData.Length); } catch { }
+                            }
+                            else if (msg.StartsWith("[END]"))
+                            {
+                                string jobInfo = msg.Replace("[END]", "").Trim();
+                                Console.WriteLine($"[STATUT] {clientId} a terminé : {jobInfo}");
+
+                                // On inclut l'ID de la machine dans le message de broadcast pour déclencher l'animation du côté des visionneurs
+                                Broadcast($"[END]|{clientId}|{jobInfo}", client);
                             }
                             else if (msg.StartsWith("[START]"))
                             {
                                 Console.WriteLine($"[STATUT] {clientId} a démarré : {msg.Replace("[START]", "").Trim()}");
-                                Broadcast(msg, client);
-                            }
-                            else if (msg.StartsWith("[END]"))
-                            {
-                                Console.WriteLine($"[STATUT] {clientId} a terminé : {msg.Replace("[END]", "").Trim()}");
                                 Broadcast(msg, client);
                             }
                             else if (msg.StartsWith("[ERROR]"))
@@ -124,20 +140,19 @@ namespace EasyServer
                             }
                             else
                             {
-                                // On diffuse les autres messages (ex: [PROGRESS]) silencieusement pour éviter le spam console
                                 Broadcast(msg, client);
                             }
                         }
                     }
                 }
             }
-            catch (Exception)
-            {
-                // Déconnexion forcée
-            }
+            catch (Exception) { }
             finally
             {
-                lock (_lock) _clients.Remove(client);
+                lock (_lock)
+                {
+                    _clients.Remove(client);
+                }
 
                 if (isIdentified)
                 {
@@ -162,7 +177,7 @@ namespace EasyServer
             byte[] data = Encoding.UTF8.GetBytes(msg + "\n");
             lock (_lock)
             {
-                foreach (var c in _clients)
+                foreach (var c in _clients.Keys)
                 {
                     if (c != sender && c.Connected)
                     {

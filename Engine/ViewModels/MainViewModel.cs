@@ -236,7 +236,6 @@ namespace EasySave.ViewModels
 
             ChangeLanguage(CurrentSettings.Language);
 
-            // Démarrage de la boucle de rafraîchissement automatique
             StartAutoRefresh();
         }
 
@@ -303,7 +302,49 @@ namespace EasySave.ViewModels
 
         private void HandleNetworkMessage(string message)
         {
-            if (message.StartsWith("[STATES_RESPONSE]|"))
+            // RECEPTION DU MESSAGE DE FIN DU SERVEUR
+            if (message.StartsWith("[END]|"))
+            {
+                var parts = message.Split(new[] { '|' }, 3);
+                if (parts.Length == 3)
+                {
+                    string rClientId = parts[1];
+                    string rJobName = parts[2].Trim();
+
+                    Action showSuccessAction = () =>
+                    {
+                        var clientState = RemoteStates.FirstOrDefault(c => c.ClientId == rClientId);
+                        var job = clientState?.Jobs.FirstOrDefault(j => j.Name == rJobName);
+                        if (job != null)
+                        {
+                            job.State = LanguageService.CurrentLanguage == "EN" ? "Finished" : "Save terminée";
+                            job.Progression = 100;
+                            job.NbFilesLeftToDo = 0;
+                            job.LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
+
+                            // Temporisation de 3 secondes avant de remettre l'affichage en INACTIVE
+                            _ = Task.Run(async () =>
+                            {
+                                await Task.Delay(3000);
+                                Action resetAction = () =>
+                                {
+                                    if (job.State == "Save terminée" || job.State == "Finished")
+                                    {
+                                        job.State = "INACTIVE";
+                                        job.Progression = 0;
+                                    }
+                                };
+                                if (_syncContext != null) _syncContext.Post(_ => resetAction(), null);
+                                else resetAction();
+                            });
+                        }
+                    };
+                    if (_syncContext != null) _syncContext.Post(_ => showSuccessAction(), null);
+                    else showSuccessAction();
+                }
+            }
+            // LECTURE DE LA BASE DES ETATS (Actualisation intelligente)
+            else if (message.StartsWith("[STATES_RESPONSE]|"))
             {
                 string jsonPayload = message.Substring(18);
                 try
@@ -312,29 +353,54 @@ namespace EasySave.ViewModels
 
                     Action updateUiAction = () =>
                     {
-                        RemoteStates.Clear();
                         if (dict != null)
                         {
+                            var activeClientIds = dict.Keys.ToList();
+
+                            // 1. On retire les clients déconnectés
+                            var clientsToRemove = RemoteStates.Where(c => !activeClientIds.Contains(c.ClientId)).ToList();
+                            foreach (var c in clientsToRemove) RemoteStates.Remove(c);
+
+                            // 2. On met à jour les clients connectés (sans écraser l'animation de succès)
                             foreach (var kvp in dict)
                             {
                                 if (kvp.Key == CurrentSettings.ClientName) continue;
 
-                                var jobs = new ObservableCollection<ClientJobState>();
+                                var clientState = RemoteStates.FirstOrDefault(c => c.ClientId == kvp.Key);
+                                if (clientState == null)
+                                {
+                                    clientState = new RemoteClientState { ClientId = kvp.Key, Jobs = new ObservableCollection<ClientJobState>() };
+                                    RemoteStates.Add(clientState);
+                                }
+
                                 try
                                 {
                                     var parsedJobs = JsonSerializer.Deserialize<List<ClientJobState>>(kvp.Value.GetRawText());
                                     if (parsedJobs != null)
                                     {
-                                        foreach (var j in parsedJobs) jobs.Add(j);
+                                        foreach (var pj in parsedJobs)
+                                        {
+                                            var existingJob = clientState.Jobs.FirstOrDefault(j => j.Name == pj.Name);
+                                            if (existingJob == null)
+                                            {
+                                                clientState.Jobs.Add(pj);
+                                            }
+                                            else
+                                            {
+                                                // IMPORTANT : Si la carte est en train d'afficher "Save terminée", on ne l'écrase pas avec INACTIVE.
+                                                if ((existingJob.State == "Save terminée" || existingJob.State == "Finished") && pj.State == "INACTIVE")
+                                                    continue;
+
+                                                existingJob.State = pj.State;
+                                                existingJob.Progression = pj.Progression;
+                                                existingJob.NbFilesLeftToDo = pj.NbFilesLeftToDo;
+                                                existingJob.TotalFilesToCopy = pj.TotalFilesToCopy;
+                                                existingJob.LastActionDate = pj.LastActionDate;
+                                            }
+                                        }
                                     }
                                 }
                                 catch { }
-
-                                RemoteStates.Add(new RemoteClientState
-                                {
-                                    ClientId = kvp.Key,
-                                    Jobs = jobs
-                                });
                             }
                         }
                     };
@@ -344,7 +410,7 @@ namespace EasySave.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Action showErrorAction = () => CurrentFile = $"Erreur : {ex.Message}";
+                    Action showErrorAction = () => CurrentFile = $"Erreur réseau : {ex.Message}";
                     if (_syncContext != null) _syncContext.Post(_ => showErrorAction(), null);
                     else showErrorAction();
                 }
@@ -401,20 +467,14 @@ namespace EasySave.ViewModels
             try
             {
                 CurrentFile = "Démarrage...";
-                _networkService.SendMessage($"[START] {SelectedJob.Name}");
+                string jobName = SelectedJob.Name;
+
+                _networkService.SendMessage($"[START] {jobName}");
 
                 await _backupEngine.ExecuteJobAsync(SelectedJob.Model);
 
-                // FORCER LA FIN DU PROCESSUS DANS LE STATETRACKER ET L'ENVOYER AU SERVEUR
-                _stateTracker.UpdateState(SelectedJob.Name, state =>
-                {
-                    state.State = "END";
-                    state.Progression = 0;
-                    state.NbFilesLeftToDo = 0;
-                });
-
-                CurrentFile = "Succès !";
-                _networkService.SendMessage($"[END] {SelectedJob.Name} - Succes");
+                CurrentFile = LanguageService.CurrentLanguage == "EN" ? "Success!" : "Succès !";
+                _networkService.SendMessage($"[END] {jobName}");
             }
             catch (Exception ex)
             {
@@ -428,26 +488,21 @@ namespace EasySave.ViewModels
             try
             {
                 CurrentFile = "Démarrage...";
+
                 foreach (var id in ids)
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
 
-                    _networkService.SendMessage($"[START] {jobVm.Name}");
+                    string jobName = jobVm.Name;
+
+                    _networkService.SendMessage($"[START] {jobName}");
 
                     await _backupEngine.ExecuteJobAsync(jobVm.Model);
 
-                    // FORCER LA FIN DU PROCESSUS DANS LE STATETRACKER ET L'ENVOYER AU SERVEUR
-                    _stateTracker.UpdateState(jobVm.Name, state =>
-                    {
-                        state.State = "END";
-                        state.Progression = 0;
-                        state.NbFilesLeftToDo = 0;
-                    });
-
-                    _networkService.SendMessage($"[END] {jobVm.Name} - Succes");
+                    _networkService.SendMessage($"[END] {jobName}");
                 }
-                CurrentFile = "Terminé avec succès !";
+                CurrentFile = LanguageService.CurrentLanguage == "EN" ? "Finished successfully!" : "Terminé avec succès !";
             }
             catch (Exception ex)
             {
@@ -488,18 +543,35 @@ namespace EasySave.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
-    public class ClientJobState
+    // Ajout d'INotifyPropertyChanged pour que l'interface puisse s'animer dynamiquement
+    public class ClientJobState : INotifyPropertyChanged
     {
-        [JsonPropertyName("Name")] public string Name { get; set; }
-        [JsonPropertyName("SourceFilePath")] public string SourceFilePath { get; set; }
-        [JsonPropertyName("TargetFilePath")] public string TargetFilePath { get; set; }
-        [JsonPropertyName("State")] public string State { get; set; }
-        [JsonPropertyName("TotalFilesToCopy")] public int TotalFilesToCopy { get; set; }
-        [JsonPropertyName("TotalFilesSize")] public long TotalFilesSize { get; set; }
-        [JsonPropertyName("NbFilesLeftToDo")] public int NbFilesLeftToDo { get; set; }
-        [JsonPropertyName("Progression")] public double Progression { get; set; }
-        [JsonPropertyName("LastActionDate")] public string LastActionDate { get; set; }
-        [JsonPropertyName("RemainingFilesSize")] public long RemainingFilesSize { get; set; }
+        private string _name;
+        [JsonPropertyName("Name")] public string Name { get => _name; set { _name = value; OnPropertyChanged(nameof(Name)); } }
+
+        private string _state;
+        [JsonPropertyName("State")] public string State { get => _state; set { _state = value; OnPropertyChanged(nameof(State)); } }
+
+        private int _totalFilesToCopy;
+        [JsonPropertyName("TotalFilesToCopy")] public int TotalFilesToCopy { get => _totalFilesToCopy; set { _totalFilesToCopy = value; OnPropertyChanged(nameof(TotalFilesToCopy)); } }
+
+        private long _totalFilesSize;
+        [JsonPropertyName("TotalFilesSize")] public long TotalFilesSize { get => _totalFilesSize; set { _totalFilesSize = value; OnPropertyChanged(nameof(TotalFilesSize)); } }
+
+        private int _nbFilesLeftToDo;
+        [JsonPropertyName("NbFilesLeftToDo")] public int NbFilesLeftToDo { get => _nbFilesLeftToDo; set { _nbFilesLeftToDo = value; OnPropertyChanged(nameof(NbFilesLeftToDo)); } }
+
+        private double _progression;
+        [JsonPropertyName("Progression")] public double Progression { get => _progression; set { _progression = value; OnPropertyChanged(nameof(Progression)); } }
+
+        private string _lastActionDate;
+        [JsonPropertyName("LastActionDate")] public string LastActionDate { get => _lastActionDate; set { _lastActionDate = value; OnPropertyChanged(nameof(LastActionDate)); } }
+
+        private long _remainingFilesSize;
+        [JsonPropertyName("RemainingFilesSize")] public long RemainingFilesSize { get => _remainingFilesSize; set { _remainingFilesSize = value; OnPropertyChanged(nameof(RemainingFilesSize)); } }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
     public class RemoteClientState : INotifyPropertyChanged
