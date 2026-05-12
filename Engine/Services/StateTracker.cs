@@ -18,6 +18,7 @@ namespace EasySave.Services
         [JsonPropertyName("TotalFilesSize")] public long TotalFilesSize { get; set; }
         [JsonPropertyName("NbFilesLeftToDo")] public int NbFilesLeftToDo { get; set; }
         [JsonPropertyName("Progression")] public int Progression { get; set; }
+        [JsonPropertyName("CurrentSpeed")] public string CurrentSpeed { get; set; }
         [JsonPropertyName("LastActionDate")] public string LastActionDate { get; set; }
         [JsonPropertyName("RemainingFilesSize")] public long RemainingFilesSize { get; set; }
     }
@@ -54,6 +55,7 @@ namespace EasySave.Services
                     TotalFilesSize = 0,
                     NbFilesLeftToDo = 0,
                     Progression = 0,
+                    CurrentSpeed = "",
                     LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"),
                     RemainingFilesSize = 0
                 });
@@ -75,6 +77,7 @@ namespace EasySave.Services
                         state.State = "INACTIVE";
                         state.Progression = 0;
                         state.NbFilesLeftToDo = 0;
+                        state.CurrentSpeed = "";
                     }
 
                     state.LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");

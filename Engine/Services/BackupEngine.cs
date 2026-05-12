@@ -15,7 +15,7 @@ namespace EasySave.Services
     {
         public delegate void ProgressUpdateHandler(string currentFile, int remainingFiles);
         public event ProgressUpdateHandler OnProgressUpdate;
-        public event Action<string, int> OnJobProgress;
+        public event Action<string, int, string> OnJobProgress;
         public event Action<string, bool> OnJobWaiting;
         public event Action<string, bool> OnJobBlocked;
         public event Action<string, bool, string> OnJobSuspendedBySoftware;
@@ -34,6 +34,9 @@ namespace EasySave.Services
 
         private readonly ConcurrentDictionary<string, ManualResetEvent> _jobPauseEvents = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> _jobCancellationTokens = new();
+
+        private readonly ConcurrentDictionary<string, Stopwatch> _jobSpeedStopwatches = new();
+        private readonly ConcurrentDictionary<string, long> _jobBytesSinceLastUpdate = new();
 
         public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
         {
@@ -125,6 +128,9 @@ namespace EasySave.Services
             _jobCancellationTokens[job.Name] = cts;
             _jobPauseEvents[job.Name] = pauseEvent;
 
+            _jobSpeedStopwatches[job.Name] = Stopwatch.StartNew();
+            _jobBytesSinceLastUpdate[job.Name] = 0;
+
             string[] allFiles = Directory.GetFiles(job.SourceDirectory, "*.*", SearchOption.AllDirectories);
             var settings = _configManager.LoadSettings();
             List<string> priorityExtensions = settings.PriorityExtensions ?? new List<string>();
@@ -138,7 +144,7 @@ namespace EasySave.Services
             _priorityFilesRemainingPerJob[job.Name] = remainingPriorityFiles;
             Interlocked.Add(ref GlobalPriorityFilesCount, remainingPriorityFiles);
 
-            lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "ACTIVE"; s.TotalFilesToCopy = totalFilesToCopy; s.NbFilesLeftToDo = totalFilesToCopy; s.Progression = 0; }); }
+            lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "ACTIVE"; s.TotalFilesToCopy = totalFilesToCopy; s.NbFilesLeftToDo = totalFilesToCopy; s.Progression = 0; s.CurrentSpeed = ""; }); }
 
             try
             {
@@ -185,12 +191,15 @@ namespace EasySave.Services
                     Interlocked.Add(ref GlobalPriorityFilesCount, -remainingPriorityFiles);
                     if (!pauseEvent.WaitOne(0)) Interlocked.Add(ref PausedPriorityFilesCount, -remainingPriorityFiles);
                 }
+
                 _priorityFilesRemainingPerJob.TryRemove(job.Name, out _);
                 _jobCancellationTokens.TryRemove(job.Name, out _);
                 _jobPauseEvents.TryRemove(job.Name, out _);
+                _jobSpeedStopwatches.TryRemove(job.Name, out _);
+                _jobBytesSinceLastUpdate.TryRemove(job.Name, out _);
 
-                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "END"; s.Progression = 0; }); }
-                OnJobProgress?.Invoke(job.Name, 100);
+                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "END"; s.Progression = 0; s.CurrentSpeed = ""; }); }
+                OnJobProgress?.Invoke(job.Name, 100, "");
             }
         }
 
@@ -212,7 +221,7 @@ namespace EasySave.Services
                 if (sourceFileInfo.LastWriteTime <= new FileInfo(targetFile).LastWriteTime)
                 {
                     shouldCopy = false;
-                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression); }); }
+                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed); }); }
                 }
             }
 
@@ -258,16 +267,23 @@ namespace EasySave.Services
                 totalSw.Start();
                 if (shouldEncrypt)
                 {
-                    encryptionTime = ExecuteCryptoSoft(source, target, job.Name, settings.EncryptionKey, token);
+                    encryptionTime = await ExecuteCryptoSoftAsync(source, target, job.Name, settings.EncryptionKey, token);
                 }
                 else
                 {
-                    token.ThrowIfCancellationRequested();
-                    File.Copy(source, target, true);
+                    await CopyFileAsync(source, target, job, fileSize, token, isLargeFile, val => largeFileLockAcquired = val);
                 }
                 totalSw.Stop();
 
-                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.NbFilesLeftToDo--; s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0; OnJobProgress?.Invoke(job.Name, s.Progression); }); }
+                lock (_stateLock)
+                {
+                    _stateTracker.UpdateState(job.Name, s =>
+                    {
+                        s.NbFilesLeftToDo--;
+                        s.Progression = s.TotalFilesToCopy > 0 ? (int)((double)(s.TotalFilesToCopy - s.NbFilesLeftToDo) / s.TotalFilesToCopy * 100) : 0;
+                        OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed);
+                    });
+                }
                 OnProgressUpdate?.Invoke(source, 0);
 
                 await DailyLogger.Instance.WriteLogAsync(new LogEntry
@@ -298,7 +314,132 @@ namespace EasySave.Services
             finally { if (largeFileLockAcquired) _largeFileLock.Release(); }
         }
 
-        private long ExecuteCryptoSoft(string source, string target, string jobName, string encryptionKey, CancellationToken token)
+        private async Task CopyFileAsync(string source, string target, BackupJob job, long fileSize, CancellationToken token, bool isLargeFile, Action<bool> updateLockStatus)
+        {
+            byte[] buffer = new byte[1024 * 1024];
+            using (FileStream sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (FileStream targetStream = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                long totalRead = 0;
+                int currentRead;
+
+                while ((currentRead = await sourceStream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+                {
+                    bool wasPaused = false;
+
+                    bool hasBusinessSoftware = GetRunningBusinessSoftware() != null;
+                    bool isManuallyPaused = _jobPauseEvents.TryGetValue(job.Name, out var pe) && !pe.WaitOne(0);
+
+                    if (hasBusinessSoftware || isManuallyPaused)
+                    {
+                        wasPaused = true;
+
+                        if (isLargeFile)
+                        {
+                            _largeFileLock.Release();
+                            updateLockStatus(false);
+                        }
+
+                        if (hasBusinessSoftware) await CheckAndWaitForBusinessSoftwareAsync(job.Name, token);
+                        if (_jobPauseEvents.TryGetValue(job.Name, out var evWait)) evWait.WaitOne();
+                        token.ThrowIfCancellationRequested();
+
+                        if (isLargeFile)
+                        {
+                            bool blockedEventFired = false;
+                            while (true)
+                            {
+                                token.ThrowIfCancellationRequested();
+
+                                bool stillNeedsWait = GetRunningBusinessSoftware() != null || (_jobPauseEvents.TryGetValue(job.Name, out var pe2) && !pe2.WaitOne(0));
+                                if (stillNeedsWait)
+                                {
+                                    if (blockedEventFired) { OnJobBlocked?.Invoke(job.Name, false); blockedEventFired = false; }
+                                    await CheckAndWaitForBusinessSoftwareAsync(job.Name, token);
+                                    if (_jobPauseEvents.TryGetValue(job.Name, out var evWait2)) evWait2.WaitOne();
+                                    continue;
+                                }
+
+                                if (await _largeFileLock.WaitAsync(200, token))
+                                {
+                                    updateLockStatus(true);
+                                    if (blockedEventFired)
+                                    {
+                                        OnJobBlocked?.Invoke(job.Name, false);
+                                        lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE"); }
+                                    }
+                                    break;
+                                }
+                                else if (!blockedEventFired)
+                                {
+                                    blockedEventFired = true;
+                                    OnJobBlocked?.Invoke(job.Name, true);
+                                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED"); }
+                                }
+                            }
+                        }
+                    }
+
+                    await targetStream.WriteAsync(buffer, 0, currentRead, token);
+                    totalRead += currentRead;
+
+                    bool isJobSw = _jobSpeedStopwatches.TryGetValue(job.Name, out var jobSw);
+                    if (isJobSw)
+                    {
+                        if (wasPaused)
+                        {
+                            jobSw.Restart();
+                            _jobBytesSinceLastUpdate[job.Name] = 0;
+                        }
+                        else
+                        {
+                            _jobBytesSinceLastUpdate.AddOrUpdate(job.Name, currentRead, (k, v) => v + currentRead);
+                        }
+                    }
+
+                    bool forceUpdate = totalRead == fileSize;
+                    bool timeElapsed = isJobSw && jobSw.ElapsedMilliseconds >= 500;
+
+                    if (timeElapsed || forceUpdate)
+                    {
+                        string speedStr = null;
+
+                        if (timeElapsed)
+                        {
+                            double seconds = jobSw.Elapsed.TotalSeconds;
+                            long bytesCopied = _jobBytesSinceLastUpdate[job.Name];
+
+                            if (seconds > 0)
+                            {
+                                double mbPerSec = (bytesCopied / seconds) / (1024.0 * 1024.0);
+                                speedStr = $"{mbPerSec:F1} Mo/s";
+                            }
+
+                            jobSw.Restart();
+                            _jobBytesSinceLastUpdate[job.Name] = 0;
+                        }
+
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(job.Name, s =>
+                            {
+                                double fileProgress = fileSize > 0 ? (double)totalRead / fileSize : 0;
+                                int overallProgress = s.TotalFilesToCopy > 0
+                                    ? (int)((((s.TotalFilesToCopy - s.NbFilesLeftToDo) + fileProgress) / s.TotalFilesToCopy) * 100)
+                                    : 0;
+
+                                s.Progression = overallProgress;
+                                if (speedStr != null) s.CurrentSpeed = speedStr;
+
+                                OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed);
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        private async Task<long> ExecuteCryptoSoftAsync(string source, string target, string jobName, string encryptionKey, CancellationToken token)
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CryptoSoft.exe");
             if (!File.Exists(path)) throw new FileNotFoundException("CryptoSoft.exe missing.");
@@ -306,7 +447,7 @@ namespace EasySave.Services
             bool cryptoLockAcquired = false;
             try
             {
-                if (_cryptoSoftLock.Wait(0)) { cryptoLockAcquired = true; }
+                if (await _cryptoSoftLock.WaitAsync(0)) { cryptoLockAcquired = true; }
                 else
                 {
                     OnJobWaiting?.Invoke(jobName, true);
@@ -316,10 +457,19 @@ namespace EasySave.Services
                     while (true)
                     {
                         token.ThrowIfCancellationRequested();
-                        if (_cryptoSoftLock.Wait(200, token)) { cryptoLockAcquired = true; break; }
+                        if (await _cryptoSoftLock.WaitAsync(200, token)) { cryptoLockAcquired = true; break; }
                     }
                     OnJobWaiting?.Invoke(jobName, false);
                     lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "ACTIVE"); }
+                }
+
+                lock (_stateLock)
+                {
+                    _stateTracker.UpdateState(jobName, s =>
+                    {
+                        s.CurrentSpeed = "Chiffrement...";
+                        OnJobProgress?.Invoke(jobName, s.Progression, s.CurrentSpeed);
+                    });
                 }
 
                 string safeKey = string.IsNullOrWhiteSpace(encryptionKey) ? "EasySaveKey" : encryptionKey;
@@ -332,8 +482,7 @@ namespace EasySave.Services
                 while (!p.HasExited)
                 {
                     if (token.IsCancellationRequested) { try { p.Kill(); } catch { } token.ThrowIfCancellationRequested(); }
-                    Thread.Sleep(50);
-                    if (cryptoSw.ElapsedMilliseconds > 60000) { try { p.Kill(); } catch { } throw new TimeoutException("CryptoSoft timeout."); }
+                    await Task.Delay(100, token);
                 }
                 cryptoSw.Stop();
 

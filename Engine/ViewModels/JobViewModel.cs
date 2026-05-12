@@ -47,6 +47,13 @@ namespace EasySave.ViewModels
             set { _progress = value; OnPropertyChanged(nameof(Progress)); }
         }
 
+        private string _currentSpeed;
+        public string CurrentSpeed
+        {
+            get => _currentSpeed;
+            set { _currentSpeed = value; OnPropertyChanged(nameof(CurrentSpeed)); }
+        }
+
         private bool _isRunning;
         public bool IsRunning
         {

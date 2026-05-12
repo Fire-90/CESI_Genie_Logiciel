@@ -85,8 +85,8 @@ namespace EasySave.ViewModels
                             var job = client?.Jobs.FirstOrDefault(j => j.Name == rJobName);
                             if (job != null)
                             {
-                                if (message.StartsWith("[END]")) { job.State = LanguageService["StateFinished"]; job.Progression = 100; job.NbFilesLeftToDo = 0; }
-                                else if (message.StartsWith("[START]")) { job.State = LanguageService["StateActive"]; job.Progression = 0; }
+                                if (message.StartsWith("[END]")) { job.State = LanguageService["StateFinished"]; job.Progression = 100; job.NbFilesLeftToDo = 0; job.CurrentSpeed = ""; }
+                                else if (message.StartsWith("[START]")) { job.State = LanguageService["StateActive"]; job.Progression = 0; job.CurrentSpeed = ""; }
                             }
                         }
                         catch { }
@@ -151,6 +151,7 @@ namespace EasySave.ViewModels
                                         {
                                             existingJob.State = pj.State;
                                             existingJob.Progression = pj.Progression;
+                                            existingJob.CurrentSpeed = pj.CurrentSpeed;
                                             existingJob.NbFilesLeftToDo = pj.NbFilesLeftToDo;
                                             existingJob.LastActionDate = pj.LastActionDate;
                                         }
@@ -162,8 +163,6 @@ namespace EasySave.ViewModels
                     }
                     else
                     {
-                        // FALLBACK SÉCURISÉ POUR EMPÊCHER LE CRASH DE LA COLLECTION: 
-                        // On reconstruit une nouvelle liste, WPF gère le remplacement de propriété sans crasher.
                         try
                         {
                             var newStates = new ObservableCollection<RemoteClientState>();
@@ -205,9 +204,11 @@ namespace EasySave.ViewModels
         public int Progression
         {
             get => _progression;
-            // Clamp entre 0 et 100 pour empêcher le crash de la ProgressBar WPF
             set { _progression = Math.Max(0, Math.Min(100, value)); OnPropertyChanged(nameof(Progression)); }
         }
+
+        private string _currentSpeed;
+        [JsonPropertyName("CurrentSpeed")] public string CurrentSpeed { get => _currentSpeed; set { _currentSpeed = value; OnPropertyChanged(nameof(CurrentSpeed)); } }
 
         private string _lastActionDate;
         [JsonPropertyName("LastActionDate")] public string LastActionDate { get => _lastActionDate; set { _lastActionDate = value; OnPropertyChanged(nameof(LastActionDate)); } }

@@ -60,6 +60,8 @@
                                                         <Run Text="%"/>
                                                     </TextBlock>
 
+                                                    <TextBlock Text="{Binding CurrentSpeed}" Foreground="#3498DB" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,5" />
+
                                                     <TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10">
 														<Run Text="{Binding NbFilesLeftToDo, Mode=OneWay}"/>
 														<Run Text="{Binding DataContext.LanguageService[ProcessTabRemaining], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>

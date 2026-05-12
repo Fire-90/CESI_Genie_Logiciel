@@ -128,7 +128,10 @@
                 <DataGridTemplateColumn Header="Progression" Width="120">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="15" Margin="5,0" Foreground="#2ECC71"/>
+                            <Grid Margin="5,0">
+                                <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="18" Foreground="#2ECC71"/>
+                                <TextBlock Text="{Binding CurrentSpeed}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#2C3E50" />
+                            </Grid>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
