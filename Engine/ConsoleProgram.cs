@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace EasySave.ConsoleApp
 {
-    class Program
+    class ConsoleProgram
     {
         private static ConsoleView _view;
         private static BackupEngine _engine;
@@ -50,7 +50,6 @@ namespace EasySave.ConsoleApp
 
         private static void ConfigureLogFormat()
         {
-            // Note : L'idéal architectural serait de placer ces Console.WriteLine dans ConsoleView.
             Console.WriteLine($"\nFormat de log actuel : {_appSettings.LogFormat.ToUpper()}");
             Console.WriteLine("Souhaitez-vous utiliser le format JSON ou XML ? (Laissez vide pour conserver la valeur actuelle)");
             Console.Write("> ");
@@ -60,8 +59,6 @@ namespace EasySave.ConsoleApp
             if (input == "xml" || input == "json")
             {
                 _appSettings.LogFormat = input;
-                // La sauvegarde du fichier settings.json suffit maintenant ! 
-                // Le DailyLogger ira lire cette valeur tout seul lors de la prochaine écriture.
                 _configManager.SaveSettings(_appSettings);
                 Console.WriteLine($"Format enregistré : {input.ToUpper()}\n");
             }
@@ -121,7 +118,6 @@ namespace EasySave.ConsoleApp
                     _configManager.SaveSettings(_appSettings);
                     _stateTracker.UpdateJobName(oldName, job.Name);
 
-                    // Feedback : Confirmation de la configuration
                     _view.DisplayMessage("ConfigSuccess", job.Name);
                 }
 

@@ -44,11 +44,11 @@ namespace EasyServer
             {
                 while (client.Connected)
                 {
-                    int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                    if (bytesRead == 0) break;
+                    int read = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    if (read == 0) break;
 
-                    string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    incompleteData += receivedData;
+                    string receivedChunk = Encoding.UTF8.GetString(buffer, 0, read);
+                    incompleteData += receivedChunk;
 
                     int newlineIndex;
                     while ((newlineIndex = incompleteData.IndexOf('\n')) >= 0)
@@ -56,48 +56,40 @@ namespace EasyServer
                         string msg = incompleteData.Substring(0, newlineIndex).TrimEnd('\r');
                         incompleteData = incompleteData.Substring(newlineIndex + 1);
 
-                        if (!isIdentified)
+                        if (msg.StartsWith("[ID]"))
                         {
-                            if (msg.StartsWith("[IDENTIFY]|"))
+                            clientId = msg.Substring(4).Trim();
+                            lock (_lock) { _clients[client] = clientId; }
+                            isIdentified = true;
+                            Console.WriteLine($"[OK] Client identifié : {clientId}");
+                            await ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry { Action = "CONNEXION", Message = $"Client {clientId} connecté" }, clientId);
+                        }
+                        else if (msg.StartsWith("[STATE]|"))
+                        {
+                            string json = msg.Substring(8);
+                            await ServerStateManager.Instance.WriteClientStateAsync(json, clientId);
+                        }
+                        else if (msg == "[GET_STATES]")
+                        {
+                            List<string> activeIds;
+                            lock (_lock) { activeIds = _clients.Values.Where(v => !string.IsNullOrEmpty(v)).ToList(); }
+                            string allStates = await ServerStateManager.Instance.GetAllClientStatesAsync(clientId, activeIds);
+                            byte[] response = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{allStates}\n");
+                            await stream.WriteAsync(response, 0, response.Length);
+                        }
+                        else if (msg.StartsWith("[LOG]|"))
+                        {
+                            var parts = msg.Split(new[] { '|' }, 4);
+                            if (parts.Length == 4)
                             {
-                                clientId = msg.Substring(11).Trim();
-                                lock (_lock) { _clients[client] = clientId; }
-                                isIdentified = true;
-                                Console.WriteLine($"[INFO] Client connecté : {clientId}");
-                                _ = ServerLogger.Instance.WriteConnectionLogAsync(new ServerLogEntry { Action = "CONNEXION", Message = "Client authentifié" }, clientId);
+                                await ServerLogger.Instance.WriteClientLogAsync(parts[3], clientId, parts[1], parts[2]);
                             }
                         }
                         else
                         {
+                            Console.WriteLine($"[MESSAGE] Reçu de {clientId} : {msg}");
+
                             string broadcastMsg = msg;
-
-                            if (msg.StartsWith("[LOG]|"))
-                            {
-                                var parts = msg.Split(new[] { '|' }, 4);
-                                if (parts.Length == 4)
-                                {
-                                    string logFormat = parts[2];
-                                    string jsonLog = parts[3];
-                                    _ = ServerLogger.Instance.WriteClientLogAsync(clientId, jsonLog, logFormat);
-                                }
-                                continue;
-                            }
-                            else if (msg.StartsWith("[STATE]|"))
-                            {
-                                string stateJson = msg.Substring(8);
-                                await ServerStateManager.Instance.WriteClientStateAsync(stateJson, clientId);
-                                continue;
-                            }
-                            else if (msg.StartsWith("[GET_STATES]"))
-                            {
-                                List<string> activeClients;
-                                lock (_lock) { activeClients = _clients.Values.Where(v => !string.IsNullOrEmpty(v)).ToList(); }
-                                string statesJson = await ServerStateManager.Instance.GetAllClientStatesAsync(clientId, activeClients);
-                                byte[] response = Encoding.UTF8.GetBytes($"[STATES_RESPONSE]|{statesJson}\n");
-                                await stream.WriteAsync(response, 0, response.Length);
-                                continue;
-                            }
-
                             if (msg.StartsWith("[START]") || msg.StartsWith("[END]") || msg.StartsWith("[PROGRESS]") || msg.StartsWith("[ERROR]"))
                             {
                                 int firstBracketEnd = msg.IndexOf(']');
