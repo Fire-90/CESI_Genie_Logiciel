@@ -73,6 +73,7 @@ namespace EasySave.Services
                 { "StateBlocked", "BLOCKED" },
                 { "StateStopped", "JUST STOPPED" },
                 { "StateFinished", "FINISHED" },
+                { "StateCanceled", "CANCELED" },
 
                 { "MsgStartGlobal", "⏳ Starting background backups..." },
                 { "MsgSuccessGlobal", "✅ All selected backups completed successfully!" },
@@ -133,6 +134,7 @@ namespace EasySave.Services
                 { "StateBlocked", "BLOQUÉ" },
                 { "StateStopped", "ARRÊTÉ" },
                 { "StateFinished", "TERMINÉ" },
+                { "StateCanceled", "ANNULÉ" },
 
                 { "MsgStartGlobal", "⏳ Démarrage des sauvegardes en arrière-plan..." },
                 { "MsgSuccessGlobal", "✅ Toutes les sauvegardes sélectionnées sont terminées !" },

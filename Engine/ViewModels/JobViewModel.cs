@@ -82,6 +82,20 @@ namespace EasySave.ViewModels
             set { _isSoftwareSuspended = value; OnPropertyChanged(nameof(IsSoftwareSuspended)); }
         }
 
+        private bool _isFinished;
+        public bool IsFinished
+        {
+            get => _isFinished;
+            set { _isFinished = value; OnPropertyChanged(nameof(IsFinished)); }
+        }
+
+        private bool _isCanceled;
+        public bool IsCanceled
+        {
+            get => _isCanceled;
+            set { _isCanceled = value; OnPropertyChanged(nameof(IsCanceled)); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) =>
           PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

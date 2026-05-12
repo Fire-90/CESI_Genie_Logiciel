@@ -50,7 +50,7 @@ namespace EasySave.ViewModels
 
             AddJobCommand = new RelayCommand(ExecuteAddJob);
             ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob);
-            DeleteJobCommand = new RelayCommand(ExecuteDeleteJob, CanExecuteSelectedJob);
+            DeleteJobCommand = new RelayCommand(ExecuteDeleteJob);
             PauseJobCommand = new RelayCommand(ExecutePauseJob);
             ResumeJobCommand = new RelayCommand(ExecuteResumeJob);
             StopJobCommand = new RelayCommand(ExecuteStopJob);
@@ -113,12 +113,12 @@ namespace EasySave.ViewModels
 
             _backupEngine.OnJobProgress += (jobName, progress) =>
             {
-                Action action = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) { jobVm.Progress = progress; if (progress >= 100) Task.Run(async () => { await Task.Delay(1500); if (_uiContext != null) _uiContext.Post(_ => jobVm.Progress = 0, null); else jobVm.Progress = 0; }); } };
+                Action action = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) { jobVm.Progress = progress; } };
                 if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
             };
         }
 
-        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e) { if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" || e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked" || e.PropertyName == "IsSoftwareSuspended") return; SaveConfig(); }
+        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e) { if (e.PropertyName == "Progress" || e.PropertyName == "IsSelected" || e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked" || e.PropertyName == "IsSoftwareSuspended" || e.PropertyName == "IsFinished" || e.PropertyName == "IsCanceled") return; SaveConfig(); }
 
         public void SaveConfig() { var settings = _configManager.LoadSettings(); settings.Jobs = Jobs.Select(j => j.Model).ToList(); _configManager.SaveSettings(settings); }
 
@@ -132,12 +132,54 @@ namespace EasySave.ViewModels
                 foreach (var jobVm in jobsToRun)
                 {
                     if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
-                    jobVm.Progress = 0; jobVm.IsRunning = true; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
+                    jobVm.Progress = 0; jobVm.IsRunning = true; jobVm.IsFinished = false; jobVm.IsCanceled = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
                     _ = Task.Run(async () =>
                     {
+                        bool wasCanceled = false;
                         try { await _backupEngine.ExecuteJobAsync(jobVm.Model); }
-                        catch (Exception ex) { string msg = ex.Message == "Job stopped manually." ? LanguageService["MsgJobStopped"] : $"{LanguageService["MsgError"]} {ex.Message}"; if (_uiContext != null) _uiContext.Post(_ => CurrentFile = msg, null); else CurrentFile = msg; }
-                        finally { Action reset = () => { jobVm.IsRunning = false; jobVm.IsWaiting = false; jobVm.IsBlocked = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = false; if (jobVm.Progress < 100) jobVm.Progress = 0; }; if (_uiContext != null) _uiContext.Post(_ => reset(), null); else reset(); }
+                        catch (Exception ex)
+                        {
+                            if (ex.Message == "Job stopped manually.") wasCanceled = true;
+                            string msg = wasCanceled ? LanguageService["MsgJobStopped"] : $"{LanguageService["MsgError"]} {ex.Message}";
+                            if (_uiContext != null) _uiContext.Post(_ => CurrentFile = msg, null); else CurrentFile = msg;
+                        }
+                        finally
+                        {
+                            Action reset = () =>
+                            {
+                                jobVm.IsWaiting = false;
+                                jobVm.IsBlocked = false;
+                                jobVm.IsPaused = false;
+                                jobVm.IsSoftwareSuspended = false;
+                                jobVm.IsRunning = false;
+
+                                if (wasCanceled)
+                                {
+                                    jobVm.IsCanceled = true;
+                                    Task.Run(async () =>
+                                    {
+                                        await Task.Delay(1500);
+                                        Action finalize = () => { jobVm.IsCanceled = false; jobVm.Progress = 0; };
+                                        if (_uiContext != null) _uiContext.Post(_ => finalize(), null); else finalize();
+                                    });
+                                }
+                                else if (jobVm.Progress >= 100)
+                                {
+                                    jobVm.IsFinished = true;
+                                    Task.Run(async () =>
+                                    {
+                                        await Task.Delay(1500);
+                                        Action finalize = () => { jobVm.IsFinished = false; jobVm.Progress = 0; };
+                                        if (_uiContext != null) _uiContext.Post(_ => finalize(), null); else finalize();
+                                    });
+                                }
+                                else
+                                {
+                                    jobVm.Progress = 0;
+                                }
+                            };
+                            if (_uiContext != null) _uiContext.Post(_ => reset(), null); else reset();
+                        }
                     });
                 }
             }
@@ -153,10 +195,49 @@ namespace EasySave.ViewModels
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
-                    jobVm.Progress = 0; jobVm.IsRunning = true; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
+                    jobVm.Progress = 0; jobVm.IsRunning = true; jobVm.IsFinished = false; jobVm.IsCanceled = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
+
+                    bool wasCanceled = false;
                     try { await _backupEngine.ExecuteJobAsync(jobVm.Model); }
-                    catch (Exception ex) { string msg = ex.Message == "Job stopped manually." ? LanguageService["MsgJobStopped"] : $"{LanguageService["MsgError"]} {ex.Message}"; CurrentFile = msg; }
-                    finally { jobVm.IsRunning = false; jobVm.IsWaiting = false; jobVm.IsBlocked = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = false; if (jobVm.Progress < 100) jobVm.Progress = 0; }
+                    catch (Exception ex)
+                    {
+                        if (ex.Message == "Job stopped manually.") wasCanceled = true;
+                        string msg = wasCanceled ? LanguageService["MsgJobStopped"] : $"{LanguageService["MsgError"]} {ex.Message}";
+                        CurrentFile = msg;
+                    }
+                    finally
+                    {
+                        jobVm.IsWaiting = false;
+                        jobVm.IsBlocked = false;
+                        jobVm.IsPaused = false;
+                        jobVm.IsSoftwareSuspended = false;
+                        jobVm.IsRunning = false;
+
+                        if (wasCanceled)
+                        {
+                            jobVm.IsCanceled = true;
+                            Task.Run(async () =>
+                            {
+                                await Task.Delay(1500);
+                                Action finalize = () => { jobVm.IsCanceled = false; jobVm.Progress = 0; };
+                                if (_uiContext != null) _uiContext.Post(_ => finalize(), null); else finalize();
+                            });
+                        }
+                        else if (jobVm.Progress >= 100)
+                        {
+                            jobVm.IsFinished = true;
+                            Task.Run(async () =>
+                            {
+                                await Task.Delay(1500);
+                                Action finalize = () => { jobVm.IsFinished = false; jobVm.Progress = 0; };
+                                if (_uiContext != null) _uiContext.Post(_ => finalize(), null); else finalize();
+                            });
+                        }
+                        else
+                        {
+                            jobVm.Progress = 0;
+                        }
+                    }
                 }
             }
             catch (Exception ex) { CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}"; }
@@ -165,9 +246,33 @@ namespace EasySave.ViewModels
         private void ExecutePauseJob(object parameter) { if (parameter is JobViewModel job) { _backupEngine.PauseJob(job.Name); job.IsPaused = true; UpdateActivityBar($"{job.Name} : PAUSE MANUELLE"); } }
         private void ExecuteResumeJob(object parameter) { if (parameter is JobViewModel job) { if (_backupEngine.GetRunningBusinessSoftware() != null) { CurrentFile = LanguageService["MsgBlockingSoftware"]; return; } _backupEngine.ResumeJob(job.Name); job.IsPaused = false; UpdateActivityBar($"{job.Name} : REPRISE"); } }
         private void ExecuteStopJob(object parameter) { if (parameter is JobViewModel job) { _backupEngine.StopJob(job.Name); UpdateActivityBar($"{job.Name} : ARRÊT FORCÉ"); } }
+
         private void ExecuteAddJob(object parameter) { int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1; var newViewModel = new JobViewModel(new BackupJob { Id = newId, Name = $"Save {newId}", SourceDirectory = "", TargetDirectory = "", Type = BackupType.Full }); newViewModel.PropertyChanged += OnJobPropertyChanged; Jobs.Add(newViewModel); SaveConfig(); SelectedJob = newViewModel; CurrentFile = LanguageService["MsgSlotAdded"]; }
-        private void ExecuteDeleteJob(object parameter) { if (SelectedJob != null) { SelectedJob.PropertyChanged -= OnJobPropertyChanged; Jobs.Remove(SelectedJob); SaveConfig(); CurrentFile = LanguageService["MsgDeleted"]; SelectedJob = null; } }
-        private bool CanExecuteSelectedJob(object parameter) => SelectedJob != null;
+
+        private void ExecuteDeleteJob(object parameter)
+        {
+            var jobsToDelete = Jobs.Where(j => j.IsSelected).ToList();
+
+            if (jobsToDelete.Any())
+            {
+                foreach (var job in jobsToDelete)
+                {
+                    job.PropertyChanged -= OnJobPropertyChanged;
+                    Jobs.Remove(job);
+                }
+                SaveConfig();
+                CurrentFile = LanguageService["MsgDeleted"];
+                SelectedJob = null;
+            }
+            else if (SelectedJob != null)
+            {
+                SelectedJob.PropertyChanged -= OnJobPropertyChanged;
+                Jobs.Remove(SelectedJob);
+                SaveConfig();
+                CurrentFile = LanguageService["MsgDeleted"];
+                SelectedJob = null;
+            }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

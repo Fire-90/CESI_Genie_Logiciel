@@ -4,236 +4,244 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d">
-	<Grid Margin="20" DataContext="{Binding JobVM}">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="*"/>
-			<RowDefinition Height="Auto"/>
-		</Grid.RowDefinitions>
+    <Grid Margin="20" DataContext="{Binding JobVM}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
 
-		<TextBlock Grid.Row="0" Text="{Binding LanguageService[Title]}" FontSize="28" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20" VerticalAlignment="Center"/>
+        <TextBlock Grid.Row="0" Text="{Binding LanguageService[Title]}" FontSize="28" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,20" VerticalAlignment="Center"/>
 
-		<DataGrid Grid.Row="1" ItemsSource="{Binding Jobs}"
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Jobs}"
                   SelectedItem="{Binding SelectedJob}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False" SelectionMode="Single" IsReadOnly="True"
                   GridLinesVisibility="None" RowHeight="35" HeadersVisibility="Column"
                   AlternatingRowBackground="#E8F1F8" Background="White" BorderBrush="#BDC3C7" BorderThickness="1">
 
-			<DataGrid.Resources>
-				<Style TargetType="DataGridColumnHeader">
-					<Setter Property="Background" Value="#2C3E50"/>
-					<Setter Property="Foreground" Value="White"/>
-					<Setter Property="Padding" Value="10,8"/>
-					<Setter Property="FontWeight" Value="SemiBold"/>
-				</Style>
-				<Style TargetType="DataGridCell">
-					<Setter Property="Padding" Value="10,0"/>
-				</Style>
-			</DataGrid.Resources>
+            <DataGrid.Resources>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="#2C3E50"/>
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Padding" Value="10,8"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </Style>
+                <Style TargetType="DataGridCell">
+                    <Setter Property="Padding" Value="10,0"/>
+                </Style>
+            </DataGrid.Resources>
 
-			<DataGrid.Columns>
-				<DataGridCheckBoxColumn Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="40">
-					<DataGridCheckBoxColumn.ElementStyle>
-						<Style TargetType="CheckBox">
-							<Setter Property="HorizontalAlignment" Value="Center"/>
-							<Setter Property="VerticalAlignment" Value="Center"/>
-							<Setter Property="Cursor" Value="Hand"/>
-						</Style>
-					</DataGridCheckBoxColumn.ElementStyle>
-				</DataGridCheckBoxColumn>
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" Width="40">
+                    <DataGridCheckBoxColumn.ElementStyle>
+                        <Style TargetType="CheckBox">
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                        </Style>
+                    </DataGridCheckBoxColumn.ElementStyle>
+                </DataGridCheckBoxColumn>
 
-				<DataGridTemplateColumn Width="110">
-					<DataGridTemplateColumn.HeaderTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding DataContext.LanguageService[LblStatus], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-						</DataTemplate>
-					</DataGridTemplateColumn.HeaderTemplate>
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<TextBlock FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Left">
-								<TextBlock.Style>
-									<Style TargetType="TextBlock">
-										<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateInactive], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-										<Setter Property="Foreground" Value="#95A5A6"/>
-										<Style.Triggers>
-											<DataTrigger Binding="{Binding IsRunning}" Value="True">
-												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateActive], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-												<Setter Property="Foreground" Value="#2ECC71"/>
-											</DataTrigger>
-											<DataTrigger Binding="{Binding IsWaiting}" Value="True">
-												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateWaiting], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-												<Setter Property="Foreground" Value="#9B59B6"/>
-											</DataTrigger>
-											<DataTrigger Binding="{Binding IsBlocked}" Value="True">
-												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateBlocked], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-												<Setter Property="Foreground" Value="#E67E22"/>
-											</DataTrigger>
-											<DataTrigger Binding="{Binding IsPaused}" Value="True">
-												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateSuspended], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-												<Setter Property="Foreground" Value="#F39C12"/>
-											</DataTrigger>
-											<DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
-												<Setter Property="Text" Value="{Binding DataContext.LanguageService[StateSuspended], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-												<Setter Property="Foreground" Value="#F39C12"/>
-											</DataTrigger>
-										</Style.Triggers>
-									</Style>
-								</TextBlock.Style>
-							</TextBlock>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-				</DataGridTemplateColumn>
+                <DataGridTemplateColumn Width="110">
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DataContext.LanguageService[LblStatus], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateInactive], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                        <Setter Property="Foreground" Value="#95A5A6"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateActive], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#2ECC71"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsWaiting}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateWaiting], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#9B59B6"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsBlocked}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateBlocked], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#E67E22"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateSuspended], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#F39C12"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateSuspended], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#F39C12"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsFinished}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateFinished], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#27AE60"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsCanceled}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateCanceled], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#E74C3C"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
 
-				<DataGridTextColumn Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150">
-					<DataGridTextColumn.HeaderTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding DataContext.LanguageService[LblName], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-						</DataTemplate>
-					</DataGridTextColumn.HeaderTemplate>
-				</DataGridTextColumn>
+                <DataGridTextColumn Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="150">
+                    <DataGridTextColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DataContext.LanguageService[LblName], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                        </DataTemplate>
+                    </DataGridTextColumn.HeaderTemplate>
+                </DataGridTextColumn>
 
-				<DataGridTextColumn Binding="{Binding SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
-					<DataGridTextColumn.HeaderTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding DataContext.LanguageService[LblSource], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-						</DataTemplate>
-					</DataGridTextColumn.HeaderTemplate>
-				</DataGridTextColumn>
+                <DataGridTextColumn Binding="{Binding SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
+                    <DataGridTextColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DataContext.LanguageService[LblSource], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                        </DataTemplate>
+                    </DataGridTextColumn.HeaderTemplate>
+                </DataGridTextColumn>
 
-				<DataGridTextColumn Binding="{Binding TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
-					<DataGridTextColumn.HeaderTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding DataContext.LanguageService[LblTarget], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-						</DataTemplate>
-					</DataGridTextColumn.HeaderTemplate>
-				</DataGridTextColumn>
+                <DataGridTextColumn Binding="{Binding TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*">
+                    <DataGridTextColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DataContext.LanguageService[LblTarget], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                        </DataTemplate>
+                    </DataGridTextColumn.HeaderTemplate>
+                </DataGridTextColumn>
 
-				<DataGridTextColumn Binding="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100">
-					<DataGridTextColumn.HeaderTemplate>
-						<DataTemplate>
-							<TextBlock Text="{Binding DataContext.LanguageService[LblType], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-						</DataTemplate>
-					</DataGridTextColumn.HeaderTemplate>
-				</DataGridTextColumn>
+                <DataGridTextColumn Binding="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100">
+                    <DataGridTextColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DataContext.LanguageService[LblType], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                        </DataTemplate>
+                    </DataGridTextColumn.HeaderTemplate>
+                </DataGridTextColumn>
 
-				<DataGridTemplateColumn Header="Progression" Width="120">
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="15" Margin="5,0" Foreground="#2ECC71"/>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-				</DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Progression" Width="120">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="15" Margin="5,0" Foreground="#2ECC71"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
 
-				<DataGridTemplateColumn Header="Actions" Width="110">
-					<DataGridTemplateColumn.CellTemplate>
-						<DataTemplate>
-							<StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-								<StackPanel.Style>
-									<Style TargetType="StackPanel">
-										<Setter Property="Visibility" Value="Collapsed"/>
-										<Style.Triggers>
-											<DataTrigger Binding="{Binding IsRunning}" Value="True">
-												<Setter Property="Visibility" Value="Visible"/>
-											</DataTrigger>
-										</Style.Triggers>
-									</Style>
-								</StackPanel.Style>
+                <DataGridTemplateColumn Header="Actions" Width="110">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
 
-								<Button Command="{Binding DataContext.PauseJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#F1C40F" BorderThickness="0" Cursor="Hand" ToolTip="Pause">
-									<Button.Content>
-										<Path Data="M 2,0 L 4,0 L 4,10 L 2,10 Z M 6,0 L 8,0 L 8,10 L 6,10 Z" Fill="White" Stretch="Uniform" Width="8" Height="10"/>
-									</Button.Content>
-									<Button.Style>
-										<Style TargetType="Button">
-											<Setter Property="Visibility" Value="Visible"/>
-											<Style.Triggers>
-												<DataTrigger Binding="{Binding IsPaused}" Value="True">
-													<Setter Property="Visibility" Value="Collapsed"/>
-												</DataTrigger>
-												<DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
-													<Setter Property="Visibility" Value="Collapsed"/>
-												</DataTrigger>
-											</Style.Triggers>
-										</Style>
-									</Button.Style>
-								</Button>
+                                <Button Command="{Binding DataContext.PauseJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#F1C40F" BorderThickness="0" Cursor="Hand" ToolTip="Pause">
+                                    <Button.Content>
+                                        <Path Data="M 2,0 L 4,0 L 4,10 L 2,10 Z M 6,0 L 8,0 L 8,10 L 6,10 Z" Fill="White" Stretch="Uniform" Width="8" Height="10"/>
+                                    </Button.Content>
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
 
-								<Button Command="{Binding DataContext.ResumeJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#2ECC71" BorderThickness="0" Cursor="Hand" ToolTip="Resume">
-									<Button.Content>
-										<Path Data="M 0,0 L 10,5 L 0,10 Z" Fill="White" Stretch="Uniform" Width="10" Height="10"/>
-									</Button.Content>
-									<Button.Style>
-										<Style TargetType="Button">
-											<Setter Property="Visibility" Value="Collapsed"/>
-											<Setter Property="Opacity" Value="1.0"/>
-											<Style.Triggers>
-												<DataTrigger Binding="{Binding IsPaused}" Value="True">
-													<Setter Property="Visibility" Value="Visible"/>
-												</DataTrigger>
-												<DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
-													<Setter Property="Visibility" Value="Visible"/>
-													<Setter Property="Opacity" Value="0.4"/>
-													<Setter Property="IsHitTestVisible" Value="False"/>
-												</DataTrigger>
-											</Style.Triggers>
-										</Style>
-									</Button.Style>
-								</Button>
+                                <Button Command="{Binding DataContext.ResumeJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#2ECC71" BorderThickness="0" Cursor="Hand" ToolTip="Resume">
+                                    <Button.Content>
+                                        <Path Data="M 0,0 L 10,5 L 0,10 Z" Fill="White" Stretch="Uniform" Width="10" Height="10"/>
+                                    </Button.Content>
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="Opacity" Value="1.0"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Setter Property="Opacity" Value="0.4"/>
+                                                    <Setter Property="IsHitTestVisible" Value="False"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
 
-								<Button Command="{Binding DataContext.StopJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#E74C3C" BorderThickness="0" Cursor="Hand" ToolTip="Stop">
-									<Button.Content>
-										<Path Data="M 0,0 L 10,0 L 10,10 L 0,10 Z" Fill="White" Stretch="Uniform" Width="10" Height="10"/>
-									</Button.Content>
-								</Button>
-							</StackPanel>
-						</DataTemplate>
-					</DataGridTemplateColumn.CellTemplate>
-				</DataGridTemplateColumn>
-			</DataGrid.Columns>
-		</DataGrid>
+                                <Button Command="{Binding DataContext.StopJobCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Width="28" Margin="2" Background="#E74C3C" BorderThickness="0" Cursor="Hand" ToolTip="Stop">
+                                    <Button.Content>
+                                        <Path Data="M 0,0 L 10,0 L 10,10 L 0,10 Z" Fill="White" Stretch="Uniform" Width="10" Height="10"/>
+                                    </Button.Content>
+                                </Button>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
 
-		<Grid Grid.Row="2" Margin="0,20,0,0">
-			<Grid.RowDefinitions>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="Auto"/>
-			</Grid.RowDefinitions>
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="*"/>
-				<ColumnDefinition Width="*"/>
-			</Grid.ColumnDefinitions>
+        <Grid Grid.Row="2" Margin="0,20,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-			<StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,15,10">
-				<TextBlock Text="{Binding LanguageService[LblName]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-				<TextBox Text="{Binding SelectedJob.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-			</StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,15,10">
+                <TextBlock Text="{Binding LanguageService[LblName]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+                <TextBox Text="{Binding SelectedJob.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+            </StackPanel>
 
-			<StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,10">
-				<TextBlock Text="{Binding LanguageService[LblType]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-				<ComboBox ItemsSource="{Binding AvailableTypes}" SelectedItem="{Binding SelectedJob.Type, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-			</StackPanel>
+            <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,10">
+                <TextBlock Text="{Binding LanguageService[LblType]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+                <ComboBox ItemsSource="{Binding AvailableTypes}" SelectedItem="{Binding SelectedJob.Type, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+            </StackPanel>
 
-			<StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,20">
-				<TextBlock Text="{Binding LanguageService[LblSource]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-				<TextBox Text="{Binding SelectedJob.SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-			</StackPanel>
+            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,20">
+                <TextBlock Text="{Binding LanguageService[LblSource]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+                <TextBox Text="{Binding SelectedJob.SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+            </StackPanel>
 
-			<StackPanel Grid.Row="1" Grid.Column="1" Margin="15,0,0,20">
-				<TextBlock Text="{Binding LanguageService[LblTarget]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-				<TextBox Text="{Binding SelectedJob.TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
-			</StackPanel>
+            <StackPanel Grid.Row="1" Grid.Column="1" Margin="15,0,0,20">
+                <TextBlock Text="{Binding LanguageService[LblTarget]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
+                <TextBox Text="{Binding SelectedJob.TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+            </StackPanel>
 
-			<StackPanel Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">
-				<TextBlock Text="{Binding LanguageService[Recent]}" FontWeight="Bold" Foreground="Gray"/>
-				<TextBlock Text="{Binding CurrentFile}" FontStyle="Italic" TextTrimming="CharacterEllipsis" Foreground="#34495E"/>
-			</StackPanel>
+            <StackPanel Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding LanguageService[Recent]}" FontWeight="Bold" Foreground="Gray"/>
+                <TextBlock Text="{Binding CurrentFile}" FontStyle="Italic" TextTrimming="CharacterEllipsis" Foreground="#34495E"/>
+            </StackPanel>
 
-			<StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-				<Button Content="{Binding LanguageService[BtnAdd]}" Command="{Binding AddJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-				<Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding DeleteJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-				<Button Content="{Binding LanguageService[BtnRun]}" Command="{Binding ExecuteSelectionCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-			</StackPanel>
-		</Grid>
-	</Grid>
+            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="{Binding LanguageService[BtnAdd]}" Command="{Binding AddJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+                <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding DeleteJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+                <Button Content="{Binding LanguageService[BtnRun]}" Command="{Binding ExecuteSelectionCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
 </UserControl>
