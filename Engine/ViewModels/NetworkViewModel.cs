@@ -55,19 +55,12 @@ namespace EasySave.ViewModels
         private void ExecuteRefreshProcesses(object parameter) { if (_currentConnectionStatus == ConnectionStatus.Connected) _networkService.SendMessage("[GET_STATES]"); }
         private void HandleConnectionStatusChanged(ConnectionStatus status) { _currentConnectionStatus = status; UpdateConnectionStatusUI(); if (status == ConnectionStatus.Connected) _stateTracker.BroadcastState(); }
 
-        private void RunOnUIThread(Action action)
+        private void UpdateConnectionStatusUI()
         {
-            if (_syncContext != null)
-            {
-                _syncContext.Post(_ => action(), null);
-            }
-            else
-            {
-                action();
-            }
+            Action action = () => { if (_currentConnectionStatus == ConnectionStatus.Connected) { ConnectionStatusText = LanguageService["StatusConnected"]; ConnectionStatusColor = "#2ECC71"; } else if (_currentConnectionStatus == ConnectionStatus.Connecting) { ConnectionStatusText = LanguageService["StatusConnecting"]; ConnectionStatusColor = "#F39C12"; } else { ConnectionStatusText = LanguageService["StatusDisconnected"]; ConnectionStatusColor = "#E74C3C"; } };
+            if (_syncContext != null) _syncContext.Post(_ => action(), null);
+            else action();
         }
-
-        private void UpdateConnectionStatusUI() { RunOnUIThread(() => { if (_currentConnectionStatus == ConnectionStatus.Connected) { ConnectionStatusText = LanguageService["StatusConnected"]; ConnectionStatusColor = "#2ECC71"; } else if (_currentConnectionStatus == ConnectionStatus.Connecting) { ConnectionStatusText = LanguageService["StatusConnecting"]; ConnectionStatusColor = "#F39C12"; } else { ConnectionStatusText = LanguageService["StatusDisconnected"]; ConnectionStatusColor = "#E74C3C"; } }); }
 
         private void HandleNetworkMessage(string message)
         {
@@ -84,7 +77,7 @@ namespace EasySave.ViewModels
                     if (message.StartsWith("[END]")) uiMsg = $"[{rClientId}] {rJobName} : END";
                     if (!string.IsNullOrEmpty(uiMsg)) OnNewRemoteActivity?.Invoke(uiMsg);
 
-                    RunOnUIThread(() =>
+                    Action action = () =>
                     {
                         try
                         {
@@ -97,7 +90,9 @@ namespace EasySave.ViewModels
                             }
                         }
                         catch { }
-                    });
+                    };
+                    if (_syncContext != null) _syncContext.Post(_ => action(), null);
+                    else action();
                 }
             }
             else if (message.StartsWith("[STATES_RESPONSE]|"))
@@ -109,64 +104,79 @@ namespace EasySave.ViewModels
                     if (dict == null) return;
 
                     var currentSettings = _configManager.LoadSettings();
-
                     var parsedClientStates = new Dictionary<string, List<ClientJobState>>();
 
                     foreach (var kvp in dict)
                     {
                         if (kvp.Key == currentSettings.ClientName) continue;
-
                         try
                         {
                             var parsedJobs = JsonSerializer.Deserialize<List<ClientJobState>>(kvp.Value.GetRawText());
-                            if (parsedJobs != null)
-                            {
-                                parsedClientStates[kvp.Key] = parsedJobs;
-                            }
+                            if (parsedJobs != null) parsedClientStates[kvp.Key] = parsedJobs;
                         }
                         catch { }
                     }
 
-                    RunOnUIThread(() =>
+                    if (_syncContext != null)
                     {
+                        _syncContext.Post(_ =>
+                        {
+                            try
+                            {
+                                var activeIds = parsedClientStates.Keys.ToList();
+                                var clientsToRemove = RemoteStates.Where(c => !activeIds.Contains(c.ClientId)).ToList();
+                                foreach (var c in clientsToRemove) RemoteStates.Remove(c);
+
+                                foreach (var kvp in parsedClientStates)
+                                {
+                                    var client = RemoteStates.FirstOrDefault(c => c.ClientId == kvp.Key);
+                                    if (client == null)
+                                    {
+                                        client = new RemoteClientState { ClientId = kvp.Key, Jobs = new ObservableCollection<ClientJobState>() };
+                                        RemoteStates.Add(client);
+                                    }
+
+                                    var currentJobNames = kvp.Value.Select(j => j.Name).ToList();
+                                    var jobsToRemove = client.Jobs.Where(j => !currentJobNames.Contains(j.Name)).ToList();
+                                    foreach (var j in jobsToRemove) client.Jobs.Remove(j);
+
+                                    foreach (var pj in kvp.Value)
+                                    {
+                                        var existingJob = client.Jobs.FirstOrDefault(j => j.Name == pj.Name);
+                                        if (existingJob == null)
+                                        {
+                                            client.Jobs.Add(pj);
+                                        }
+                                        else if (existingJob.State != LanguageService["StateFinished"] || pj.State != "INACTIVE")
+                                        {
+                                            existingJob.State = pj.State;
+                                            existingJob.Progression = pj.Progression;
+                                            existingJob.NbFilesLeftToDo = pj.NbFilesLeftToDo;
+                                            existingJob.LastActionDate = pj.LastActionDate;
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                        }, null);
+                    }
+                    else
+                    {
+                        // FALLBACK SÉCURISÉ POUR EMPÊCHER LE CRASH DE LA COLLECTION: 
+                        // On reconstruit une nouvelle liste, WPF gère le remplacement de propriété sans crasher.
                         try
                         {
-                            var activeIds = parsedClientStates.Keys.ToList();
-
-                            var clientsToRemove = RemoteStates.Where(c => !activeIds.Contains(c.ClientId)).ToList();
-                            foreach (var c in clientsToRemove)
-                            {
-                                RemoteStates.Remove(c);
-                            }
-
+                            var newStates = new ObservableCollection<RemoteClientState>();
                             foreach (var kvp in parsedClientStates)
                             {
-                                var client = RemoteStates.FirstOrDefault(c => c.ClientId == kvp.Key);
-                                if (client == null)
-                                {
-                                    client = new RemoteClientState { ClientId = kvp.Key, Jobs = new ObservableCollection<ClientJobState>() };
-                                    RemoteStates.Add(client);
-                                }
-
-                                foreach (var pj in kvp.Value)
-                                {
-                                    var existingJob = client.Jobs.FirstOrDefault(j => j.Name == pj.Name);
-                                    if (existingJob == null)
-                                    {
-                                        client.Jobs.Add(pj);
-                                    }
-                                    else if (existingJob.State != LanguageService["StateFinished"] || pj.State != "INACTIVE")
-                                    {
-                                        existingJob.State = pj.State;
-                                        existingJob.Progression = pj.Progression;
-                                        existingJob.NbFilesLeftToDo = pj.NbFilesLeftToDo;
-                                        existingJob.LastActionDate = pj.LastActionDate;
-                                    }
-                                }
+                                var newClient = new RemoteClientState { ClientId = kvp.Key, Jobs = new ObservableCollection<ClientJobState>() };
+                                foreach (var pj in kvp.Value) newClient.Jobs.Add(pj);
+                                newStates.Add(newClient);
                             }
+                            RemoteStates = newStates;
                         }
                         catch { }
-                    });
+                    }
                 }
                 catch { }
             }
@@ -180,14 +190,25 @@ namespace EasySave.ViewModels
     {
         private string _name;
         [JsonPropertyName("Name")] public string Name { get => _name; set { _name = value; OnPropertyChanged(nameof(Name)); } }
+
         private string _state;
         [JsonPropertyName("State")] public string State { get => _state; set { _state = value; OnPropertyChanged(nameof(State)); } }
+
         private int _totalFilesToCopy;
         [JsonPropertyName("TotalFilesToCopy")] public int TotalFilesToCopy { get => _totalFilesToCopy; set { _totalFilesToCopy = value; OnPropertyChanged(nameof(TotalFilesToCopy)); } }
+
         private int _nbFilesLeftToDo;
         [JsonPropertyName("NbFilesLeftToDo")] public int NbFilesLeftToDo { get => _nbFilesLeftToDo; set { _nbFilesLeftToDo = value; OnPropertyChanged(nameof(NbFilesLeftToDo)); } }
+
         private int _progression;
-        [JsonPropertyName("Progression")] public int Progression { get => _progression; set { _progression = value; OnPropertyChanged(nameof(Progression)); } }
+        [JsonPropertyName("Progression")]
+        public int Progression
+        {
+            get => _progression;
+            // Clamp entre 0 et 100 pour empêcher le crash de la ProgressBar WPF
+            set { _progression = Math.Max(0, Math.Min(100, value)); OnPropertyChanged(nameof(Progression)); }
+        }
+
         private string _lastActionDate;
         [JsonPropertyName("LastActionDate")] public string LastActionDate { get => _lastActionDate; set { _lastActionDate = value; OnPropertyChanged(nameof(LastActionDate)); } }
 
@@ -199,6 +220,7 @@ namespace EasySave.ViewModels
     {
         private string _clientId;
         public string ClientId { get => _clientId; set { _clientId = value; OnPropertyChanged(nameof(ClientId)); } }
+
         private ObservableCollection<ClientJobState> _jobs;
         public ObservableCollection<ClientJobState> Jobs { get => _jobs; set { _jobs = value; OnPropertyChanged(nameof(Jobs)); } }
 

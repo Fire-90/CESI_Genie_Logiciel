@@ -55,7 +55,10 @@
 
                                                     <ProgressBar Value="{Binding Progression}" Maximum="100" Height="6" Margin="0,0,0,8" Foreground="#3498DB" Background="#E0E0E0" BorderThickness="0"/>
 
-                                                    <TextBlock Foreground="#2C3E50" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5" Text="{Binding Progression, StringFormat='{}{0:F0}%'}"/>
+                                                    <TextBlock Foreground="#2C3E50" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5">
+                                                        <Run Text="{Binding Progression}"/>
+                                                        <Run Text="%"/>
+                                                    </TextBlock>
 
                                                     <TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10">
 														<Run Text="{Binding NbFilesLeftToDo}"/>
