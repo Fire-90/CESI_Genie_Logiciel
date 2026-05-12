@@ -90,10 +90,37 @@ namespace EasyServer
                 {
                     if (File.Exists(stateFilePath))
                     {
-                        File.Delete(stateFilePath);
+                        string json = File.ReadAllText(stateFilePath);
+                        // On désérialise en liste de dictionnaires pour pouvoir modifier les valeurs dynamiquement
+                        var jobs = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
+
+                        if (jobs != null)
+                        {
+                            foreach (var job in jobs)
+                            {
+                                // Réinitialisation de toutes les données d'état
+                                if (job.ContainsKey("State")) job["State"] = "INACTIVE";
+                                if (job.ContainsKey("SourceFilePath")) job["SourceFilePath"] = "";
+                                if (job.ContainsKey("TargetFilePath")) job["TargetFilePath"] = "";
+                                if (job.ContainsKey("TotalFilesToCopy")) job["TotalFilesToCopy"] = 0;
+                                if (job.ContainsKey("TotalFilesSize")) job["TotalFilesSize"] = 0;
+                                if (job.ContainsKey("NbFilesLeftToDo")) job["NbFilesLeftToDo"] = 0;
+                                if (job.ContainsKey("Progression")) job["Progression"] = 0;
+                                if (job.ContainsKey("CurrentSpeed")) job["CurrentSpeed"] = "";
+                                if (job.ContainsKey("RemainingFilesSize")) job["RemainingFilesSize"] = 0;
+
+                            }
+
+                            // Sauvegarde du fichier nettoyé
+                            var options = new JsonSerializerOptions { WriteIndented = true };
+                            File.WriteAllText(stateFilePath, JsonSerializer.Serialize(jobs, options));
+                        }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[ERREUR] Impossible de nettoyer le state de {clientId}: {ex.Message}");
+                }
             }
         }
     }
