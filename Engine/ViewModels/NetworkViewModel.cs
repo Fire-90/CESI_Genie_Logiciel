@@ -54,7 +54,20 @@ namespace EasySave.ViewModels
         private void StartAutoRefresh() { Task.Run(async () => { while (true) { if (_currentConnectionStatus == ConnectionStatus.Connected) _networkService.SendMessage("[GET_STATES]"); await Task.Delay(2000); } }); }
         private void ExecuteRefreshProcesses(object parameter) { if (_currentConnectionStatus == ConnectionStatus.Connected) _networkService.SendMessage("[GET_STATES]"); }
         private void HandleConnectionStatusChanged(ConnectionStatus status) { _currentConnectionStatus = status; UpdateConnectionStatusUI(); if (status == ConnectionStatus.Connected) _stateTracker.BroadcastState(); }
-        private void UpdateConnectionStatusUI() { Action action = () => { if (_currentConnectionStatus == ConnectionStatus.Connected) { ConnectionStatusText = LanguageService["StatusConnected"]; ConnectionStatusColor = "#2ECC71"; } else if (_currentConnectionStatus == ConnectionStatus.Connecting) { ConnectionStatusText = LanguageService["StatusConnecting"]; ConnectionStatusColor = "#F39C12"; } else { ConnectionStatusText = LanguageService["StatusDisconnected"]; ConnectionStatusColor = "#E74C3C"; } }; if (_syncContext != null) _syncContext.Post(_ => action(), null); else action(); }
+
+        private void RunOnUIThread(Action action)
+        {
+            if (_syncContext != null)
+            {
+                _syncContext.Post(_ => action(), null);
+            }
+            else
+            {
+                action();
+            }
+        }
+
+        private void UpdateConnectionStatusUI() { RunOnUIThread(() => { if (_currentConnectionStatus == ConnectionStatus.Connected) { ConnectionStatusText = LanguageService["StatusConnected"]; ConnectionStatusColor = "#2ECC71"; } else if (_currentConnectionStatus == ConnectionStatus.Connecting) { ConnectionStatusText = LanguageService["StatusConnecting"]; ConnectionStatusColor = "#F39C12"; } else { ConnectionStatusText = LanguageService["StatusDisconnected"]; ConnectionStatusColor = "#E74C3C"; } }); }
 
         private void HandleNetworkMessage(string message)
         {
@@ -71,17 +84,20 @@ namespace EasySave.ViewModels
                     if (message.StartsWith("[END]")) uiMsg = $"[{rClientId}] {rJobName} : END";
                     if (!string.IsNullOrEmpty(uiMsg)) OnNewRemoteActivity?.Invoke(uiMsg);
 
-                    Action action = () =>
+                    RunOnUIThread(() =>
                     {
-                        var client = RemoteStates.FirstOrDefault(c => c.ClientId == rClientId);
-                        var job = client?.Jobs.FirstOrDefault(j => j.Name == rJobName);
-                        if (job != null)
+                        try
                         {
-                            if (message.StartsWith("[END]")) { job.State = LanguageService["StateFinished"]; job.Progression = 100; job.NbFilesLeftToDo = 0; }
-                            else if (message.StartsWith("[START]")) { job.State = LanguageService["StateActive"]; job.Progression = 0; }
+                            var client = RemoteStates.FirstOrDefault(c => c.ClientId == rClientId);
+                            var job = client?.Jobs.FirstOrDefault(j => j.Name == rJobName);
+                            if (job != null)
+                            {
+                                if (message.StartsWith("[END]")) { job.State = LanguageService["StateFinished"]; job.Progression = 100; job.NbFilesLeftToDo = 0; }
+                                else if (message.StartsWith("[START]")) { job.State = LanguageService["StateActive"]; job.Progression = 0; }
+                            }
                         }
-                    };
-                    if (_syncContext != null) _syncContext.Post(_ => action(), null); else action();
+                        catch { }
+                    });
                 }
             }
             else if (message.StartsWith("[STATES_RESPONSE]|"))
@@ -90,29 +106,67 @@ namespace EasySave.ViewModels
                 try
                 {
                     var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonPayload);
-                    Action updateUi = () =>
+                    if (dict == null) return;
+
+                    var currentSettings = _configManager.LoadSettings();
+
+                    var parsedClientStates = new Dictionary<string, List<ClientJobState>>();
+
+                    foreach (var kvp in dict)
                     {
-                        if (dict == null) return;
-                        var activeIds = dict.Keys.ToList();
-                        RemoteStates.Where(c => !activeIds.Contains(c.ClientId)).ToList().ForEach(c => RemoteStates.Remove(c));
-                        var currentSettings = _configManager.LoadSettings();
-                        foreach (var kvp in dict)
+                        if (kvp.Key == currentSettings.ClientName) continue;
+
+                        try
                         {
-                            if (kvp.Key == currentSettings.ClientName) continue;
-                            var client = RemoteStates.FirstOrDefault(c => c.ClientId == kvp.Key);
-                            if (client == null) { client = new RemoteClientState { ClientId = kvp.Key, Jobs = new ObservableCollection<ClientJobState>() }; RemoteStates.Add(client); }
                             var parsedJobs = JsonSerializer.Deserialize<List<ClientJobState>>(kvp.Value.GetRawText());
-                            if (parsedJobs == null) continue;
-                            foreach (var pj in parsedJobs)
+                            if (parsedJobs != null)
                             {
-                                var existingJob = client.Jobs.FirstOrDefault(j => j.Name == pj.Name);
-                                if (existingJob == null) client.Jobs.Add(pj);
-                                else if (existingJob.State != LanguageService["StateFinished"] || pj.State != "INACTIVE")
-                                { existingJob.State = pj.State; existingJob.Progression = pj.Progression; existingJob.NbFilesLeftToDo = pj.NbFilesLeftToDo; existingJob.LastActionDate = pj.LastActionDate; }
+                                parsedClientStates[kvp.Key] = parsedJobs;
                             }
                         }
-                    };
-                    if (_syncContext != null) _syncContext.Post(_ => updateUi(), null); else updateUi();
+                        catch { }
+                    }
+
+                    RunOnUIThread(() =>
+                    {
+                        try
+                        {
+                            var activeIds = parsedClientStates.Keys.ToList();
+
+                            var clientsToRemove = RemoteStates.Where(c => !activeIds.Contains(c.ClientId)).ToList();
+                            foreach (var c in clientsToRemove)
+                            {
+                                RemoteStates.Remove(c);
+                            }
+
+                            foreach (var kvp in parsedClientStates)
+                            {
+                                var client = RemoteStates.FirstOrDefault(c => c.ClientId == kvp.Key);
+                                if (client == null)
+                                {
+                                    client = new RemoteClientState { ClientId = kvp.Key, Jobs = new ObservableCollection<ClientJobState>() };
+                                    RemoteStates.Add(client);
+                                }
+
+                                foreach (var pj in kvp.Value)
+                                {
+                                    var existingJob = client.Jobs.FirstOrDefault(j => j.Name == pj.Name);
+                                    if (existingJob == null)
+                                    {
+                                        client.Jobs.Add(pj);
+                                    }
+                                    else if (existingJob.State != LanguageService["StateFinished"] || pj.State != "INACTIVE")
+                                    {
+                                        existingJob.State = pj.State;
+                                        existingJob.Progression = pj.Progression;
+                                        existingJob.NbFilesLeftToDo = pj.NbFilesLeftToDo;
+                                        existingJob.LastActionDate = pj.LastActionDate;
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    });
                 }
                 catch { }
             }
@@ -132,10 +186,11 @@ namespace EasySave.ViewModels
         [JsonPropertyName("TotalFilesToCopy")] public int TotalFilesToCopy { get => _totalFilesToCopy; set { _totalFilesToCopy = value; OnPropertyChanged(nameof(TotalFilesToCopy)); } }
         private int _nbFilesLeftToDo;
         [JsonPropertyName("NbFilesLeftToDo")] public int NbFilesLeftToDo { get => _nbFilesLeftToDo; set { _nbFilesLeftToDo = value; OnPropertyChanged(nameof(NbFilesLeftToDo)); } }
-        private double _progression;
-        [JsonPropertyName("Progression")] public double Progression { get => _progression; set { _progression = value; OnPropertyChanged(nameof(Progression)); } }
+        private int _progression;
+        [JsonPropertyName("Progression")] public int Progression { get => _progression; set { _progression = value; OnPropertyChanged(nameof(Progression)); } }
         private string _lastActionDate;
         [JsonPropertyName("LastActionDate")] public string LastActionDate { get => _lastActionDate; set { _lastActionDate = value; OnPropertyChanged(nameof(LastActionDate)); } }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
@@ -146,6 +201,7 @@ namespace EasySave.ViewModels
         public string ClientId { get => _clientId; set { _clientId = value; OnPropertyChanged(nameof(ClientId)); } }
         private ObservableCollection<ClientJobState> _jobs;
         public ObservableCollection<ClientJobState> Jobs { get => _jobs; set { _jobs = value; OnPropertyChanged(nameof(Jobs)); } }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
