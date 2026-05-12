@@ -71,15 +71,6 @@ namespace EasySave.Services
                 if (state != null)
                 {
                     updateAction(state);
-
-                    if (state.State == "END")
-                    {
-                        state.State = "INACTIVE";
-                        state.Progression = 0;
-                        state.NbFilesLeftToDo = 0;
-                        state.CurrentSpeed = "";
-                    }
-
                     state.LastActionDate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
                     WriteAllStates();
                 }

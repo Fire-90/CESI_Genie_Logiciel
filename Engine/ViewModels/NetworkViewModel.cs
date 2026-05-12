@@ -112,7 +112,23 @@ namespace EasySave.ViewModels
                         try
                         {
                             var parsedJobs = JsonSerializer.Deserialize<List<ClientJobState>>(kvp.Value.GetRawText());
-                            if (parsedJobs != null) parsedClientStates[kvp.Key] = parsedJobs;
+                            if (parsedJobs != null)
+                            {
+                                foreach (var pj in parsedJobs)
+                                {
+                                    switch (pj.State)
+                                    {
+                                        case "ACTIVE": pj.State = LanguageService["StateActive"]; break;
+                                        case "INACTIVE": pj.State = LanguageService["StateInactive"]; break;
+                                        case "FINISHED":
+                                        case "END": pj.State = LanguageService["StateFinished"]; break;
+                                        case "BLOCKED": pj.State = LanguageService["StateBlocked"]; break;
+                                        case "SUSPENDED": pj.State = LanguageService["StateSuspended"]; break;
+                                        case "WAITING": pj.State = LanguageService["StateWaiting"]; break;
+                                    }
+                                }
+                                parsedClientStates[kvp.Key] = parsedJobs;
+                            }
                         }
                         catch { }
                     }
@@ -147,7 +163,7 @@ namespace EasySave.ViewModels
                                         {
                                             client.Jobs.Add(pj);
                                         }
-                                        else if (existingJob.State != LanguageService["StateFinished"] || pj.State != "INACTIVE")
+                                        else
                                         {
                                             existingJob.State = pj.State;
                                             existingJob.Progression = pj.Progression;

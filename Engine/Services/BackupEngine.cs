@@ -198,8 +198,24 @@ namespace EasySave.Services
                 _jobSpeedStopwatches.TryRemove(job.Name, out _);
                 _jobBytesSinceLastUpdate.TryRemove(job.Name, out _);
 
-                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "END"; s.Progression = 0; s.CurrentSpeed = ""; }); }
+                // FINISHED permet une traduction propre côté client (au lieu de END qui s'affichait brut)
+                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "FINISHED"; s.Progression = 100; s.CurrentSpeed = ""; }); }
                 OnJobProgress?.Invoke(job.Name, 100, "");
+
+                Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    lock (_stateLock)
+                    {
+                        _stateTracker.UpdateState(job.Name, s =>
+                        {
+                            s.State = "INACTIVE";
+                            s.Progression = 0;
+                            s.NbFilesLeftToDo = 0;
+                            s.CurrentSpeed = "";
+                        });
+                    }
+                });
             }
         }
 

@@ -78,5 +78,23 @@ namespace EasyServer
 
             return JsonSerializer.Serialize(states);
         }
+
+        public void RemoveClientState(string clientId)
+        {
+            string safeClientId = clientId.Replace(":", "-");
+            string stateFilePath = Path.Combine(_baseDataDirectory, safeClientId, "state.json");
+
+            lock (_lockObj)
+            {
+                try
+                {
+                    if (File.Exists(stateFilePath))
+                    {
+                        File.Delete(stateFilePath);
+                    }
+                }
+                catch { }
+            }
+        }
     }
 }
