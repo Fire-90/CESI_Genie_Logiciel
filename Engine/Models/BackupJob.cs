@@ -1,13 +1,8 @@
-﻿using System.Text.Json.Serialization;
+﻿using EasySave.Models;
+using System.Text.Json.Serialization;
 
 namespace EasySave.Models
 {
-    public enum BackupType
-    {
-        Full,
-        Differential
-    }
-
     public class BackupJob
     {
         public int Id { get; set; }

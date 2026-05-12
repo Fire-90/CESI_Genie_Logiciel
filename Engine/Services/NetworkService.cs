@@ -1,17 +1,11 @@
 ﻿using System;
 using System.Net.Sockets;
 using System.Text;
+using EasySave.Models;
 using System.Threading.Tasks;
 
 namespace EasySave.Services
 {
-    public enum ConnectionStatus
-    {
-        Connecting,
-        Connected,
-        Disconnected
-    }
-
     public class NetworkService
     {
         private TcpClient _client;

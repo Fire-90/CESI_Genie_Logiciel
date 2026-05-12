@@ -29,6 +29,11 @@
                 </Style>
                 <Style TargetType="DataGridCell">
                     <Setter Property="Padding" Value="10,0"/>
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                </Style>
+                <Style TargetType="DataGridRow">
+                    <EventSetter Event="MouseDoubleClick" Handler="DataGridRow_MouseDoubleClick"/>
                 </Style>
             </DataGrid.Resources>
 
