@@ -56,13 +56,13 @@
                                                     <ProgressBar Value="{Binding Progression}" Maximum="100" Height="6" Margin="0,0,0,8" Foreground="#3498DB" Background="#E0E0E0" BorderThickness="0"/>
 
                                                     <TextBlock Foreground="#2C3E50" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5">
-                                                        <Run Text="{Binding Progression}"/>
+                                                        <Run Text="{Binding Progression, Mode=OneWay}"/>
                                                         <Run Text="%"/>
                                                     </TextBlock>
 
                                                     <TextBlock Foreground="#7F8C8D" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,10">
-														<Run Text="{Binding NbFilesLeftToDo}"/>
-														<Run Text="{Binding DataContext.LanguageService[ProcessTabRemaining], RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+														<Run Text="{Binding NbFilesLeftToDo, Mode=OneWay}"/>
+														<Run Text="{Binding DataContext.LanguageService[ProcessTabRemaining], RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>
                                                     </TextBlock>
 
                                                     <TextBlock Foreground="#BDC3C7" FontSize="10" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding LastActionDate}"/>
