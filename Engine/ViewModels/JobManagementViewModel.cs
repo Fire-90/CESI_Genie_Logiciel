@@ -58,7 +58,16 @@ namespace EasySave.ViewModels
             RegisterEngineEvents();
         }
 
-        public void ExternalActivityUpdate(string message) { UpdateActivityBar(message); }
+        public void ExternalActivityUpdate(string message)
+        {
+            string displayMsg = message;
+
+            if (message.Contains(": START")) displayMsg = message.Replace(": START", " : " + LanguageService["StateActive"]);
+            else if (message.Contains(": END")) displayMsg = message.Replace(": END", " : " + LanguageService["StateFinished"]);
+
+            if (_uiContext != null) _uiContext.Post(_ => CurrentFile = displayMsg, null);
+            else CurrentFile = displayMsg;
+        }
 
         private void UpdateActivityBar(string rawMessage)
         {
