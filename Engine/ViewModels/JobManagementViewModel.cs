@@ -90,22 +90,33 @@ namespace EasySave.ViewModels
                 UpdateActivityBar(message);
             };
 
-            _backupEngine.OnJobSuspendedBySoftware += (jobName, isSuspended, software) => {
-                Action action = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) jobVm.IsSoftwareSuspended = isSuspended; };
+            _backupEngine.OnJobSuspendedBySoftware += (jobName, isSuspended, software) =>
+            {
+                Action action = () =>
+                {
+                    // Synchronise l'état de suspension métier pour tous les travaux en cours d'exécution
+                    foreach (var jobVm in Jobs.Where(j => j.IsRunning))
+                    {
+                        jobVm.IsSoftwareSuspended = isSuspended;
+                    }
+                };
                 if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
             };
 
-            _backupEngine.OnJobWaiting += (jobName, isWaiting) => {
+            _backupEngine.OnJobWaiting += (jobName, isWaiting) =>
+            {
                 Action action = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) jobVm.IsWaiting = isWaiting; };
                 if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
             };
 
-            _backupEngine.OnJobBlocked += (jobName, isBlocked) => {
+            _backupEngine.OnJobBlocked += (jobName, isBlocked) =>
+            {
                 Action action = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) jobVm.IsBlocked = isBlocked; };
                 if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
             };
 
-            _backupEngine.OnJobProgress += (jobName, progress) => {
+            _backupEngine.OnJobProgress += (jobName, progress) =>
+            {
                 Action action = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) { jobVm.Progress = progress; if (progress >= 100) Task.Run(async () => { await Task.Delay(1500); if (_uiContext != null) _uiContext.Post(_ => jobVm.Progress = 0, null); else jobVm.Progress = 0; }); } };
                 if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
             };
@@ -126,7 +137,8 @@ namespace EasySave.ViewModels
                 {
                     if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
                     jobVm.Progress = 0; jobVm.IsRunning = true; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
-                    _ = Task.Run(async () => {
+                    _ = Task.Run(async () =>
+                    {
                         try { await _backupEngine.ExecuteJobAsync(jobVm.Model); }
                         catch (Exception ex) { string msg = ex.Message == "Job stopped manually." ? LanguageService["MsgJobStopped"] : $"{LanguageService["MsgError"]} {ex.Message}"; if (_uiContext != null) _uiContext.Post(_ => CurrentFile = msg, null); else CurrentFile = msg; }
                         finally { Action reset = () => { jobVm.IsRunning = false; jobVm.IsWaiting = false; jobVm.IsBlocked = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = false; if (jobVm.Progress < 100) jobVm.Progress = 0; }; if (_uiContext != null) _uiContext.Post(_ => reset(), null); else reset(); }
