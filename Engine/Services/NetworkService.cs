@@ -44,7 +44,6 @@ namespace EasySave.Services
                             string ipAddress = string.IsNullOrWhiteSpace(settings.ServerIP) ? "127.0.0.1" : settings.ServerIP;
 
                             _client = new TcpClient();
-                            // Désactive l'algorithme de Nagle pour envoyer les petits paquets immédiatement
                             _client.NoDelay = true;
 
                             await _client.ConnectAsync(ipAddress, _port);
@@ -53,10 +52,8 @@ namespace EasySave.Services
                             {
                                 OnConnectionStatusChanged?.Invoke(ConnectionStatus.Connected);
 
-                                // On envoie l'ID immédiatement après la connexion
                                 SendMessage($"[ID] {settings.ClientName}");
 
-                                // On lance l'écoute
                                 _ = ListenToServer(_client);
                             }
                         }
@@ -65,7 +62,7 @@ namespace EasySave.Services
                     {
                         OnConnectionStatusChanged?.Invoke(ConnectionStatus.Disconnected);
                     }
-                    await Task.Delay(5000); // Réessai toutes les 5 secondes
+                    await Task.Delay(5000);
                 }
             });
         }
@@ -113,7 +110,7 @@ namespace EasySave.Services
                         var stream = _client.GetStream();
                         byte[] data = Encoding.UTF8.GetBytes(message + "\n");
                         stream.Write(data, 0, data.Length);
-                        stream.Flush(); // Force l'envoi immédiat sur le réseau
+                        stream.Flush();
                     }
                     catch { }
                 }

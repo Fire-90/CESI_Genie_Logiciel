@@ -27,9 +27,9 @@ namespace EasyServer
     [Serializable]
     public class ClientLogEntry
     {
-        public string ClientId { get; set; } // Identifiant du client émetteur
-        public string JobId { get; set; }    // ID du travail
-        public string Name { get; set; }     // Nom du travail
+        public string ClientId { get; set; }
+        public string JobId { get; set; }
+        public string Name { get; set; }
         public string FileSource { get; set; }
         public string FileTarget { get; set; }
         public long FileSize { get; set; }
@@ -53,9 +53,6 @@ namespace EasyServer
             if (!Directory.Exists(_baseDataDirectory)) Directory.CreateDirectory(_baseDataDirectory);
         }
 
-        /// <summary>
-        /// Journal de connexion global : data/connection_history.json
-        /// </summary>
         public async Task WriteConnectionLogAsync(ServerLogEntry entry, string clientId)
         {
             entry.ClientId = clientId;
@@ -75,11 +72,6 @@ namespace EasyServer
             await Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Écrit les logs : 
-        /// 1. Dans le dossier client (data/ID/logs/)
-        /// 2. Dans le journal global (data/global_activity_log.json)
-        /// </summary>
         public async Task WriteClientLogAsync(string jsonEntry, string clientId, string jobId, string format)
         {
             string safeClientId = clientId.Replace(":", "-");
@@ -95,13 +87,11 @@ namespace EasyServer
                 entry.JobId = jobId;
                 entry.ClientId = clientId;
 
-                // 1. Écriture dans le log spécifique du client
                 if (format.ToLower() == "xml")
                     WriteXmlClientLog(entry, clientLogDir);
                 else
                     WriteJsonClientLog(entry, clientLogDir);
 
-                // 2. Écriture dans le grand journal global (toujours en JSON)
                 WriteGlobalActivityLog(entry);
             }
             catch { }
@@ -124,9 +114,6 @@ namespace EasyServer
             }
         }
 
-        /// <summary>
-        /// Ajoute l'entrée au grand fichier de log général : data/global_activity_log.json
-        /// </summary>
         private void WriteGlobalActivityLog(ClientLogEntry entry)
         {
             string filePath = Path.Combine(_baseDataDirectory, "global_activity_log.json");

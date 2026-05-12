@@ -117,8 +117,8 @@ namespace EasySave.Services
         public string ServerIP { get; set; } = "127.0.0.1";
         public string ClientName { get; set; } = "Client-" + Environment.MachineName;
 
-        public long MaxParallelFileSizeLimit { get; set; } = 50000;
-        public string MaxParallelFileSizeLimitUnit { get; set; } = "Ko"; // Unité par défaut
+        public long MaxParallelFileSizeLimit { get; set; } = 500;
+        public string MaxParallelFileSizeLimitUnit { get; set; } = "Mo";
         public string EncryptionKey { get; set; } = "EasySaveKey";
 
         public List<BackupJob> Jobs { get; set; } = new List<BackupJob>();

@@ -49,7 +49,7 @@ namespace EasySave.Services
                     Name = job.Name,
                     SourceFilePath = "",
                     TargetFilePath = "",
-                    State = "INACTIVE", // Par défaut
+                    State = "INACTIVE",
                     TotalFilesToCopy = 0,
                     TotalFilesSize = 0,
                     NbFilesLeftToDo = 0,
@@ -70,7 +70,6 @@ namespace EasySave.Services
                 {
                     updateAction(state);
 
-                    // INTERCEPTION : Transforme la fin d'une tâche en INACTIVE
                     if (state.State == "END")
                     {
                         state.State = "INACTIVE";

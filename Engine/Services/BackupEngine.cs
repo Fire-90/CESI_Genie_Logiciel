@@ -277,7 +277,7 @@ namespace EasySave.Services
                     FileTarget = target,
                     FileSize = fileSize,
                     FileTransferTime = totalSw.ElapsedMilliseconds,
-                    EncryptionTime = encryptionTime // On passe le temps mesuré ici
+                    EncryptionTime = encryptionTime
                 }, job.Id.ToString(), settings.LogFormat);
             }
             catch (OperationCanceledException) { throw; }
@@ -337,7 +337,7 @@ namespace EasySave.Services
                 }
                 cryptoSw.Stop();
 
-                if (p.ExitCode != 0) return -p.ExitCode; // Temps négatif pour les codes d'erreur
+                if (p.ExitCode != 0) return -p.ExitCode;
                 return cryptoSw.ElapsedMilliseconds;
             }
             finally { if (cryptoLockAcquired) _cryptoSoftLock.Release(); }

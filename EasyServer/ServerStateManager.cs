@@ -60,7 +60,6 @@ namespace EasyServer
                 {
                     string clientId = Path.GetFileName(dir);
 
-                    // ON EXCLUT L'UTILISATEUR QUI FAIT LA REQUÊTE ET LES UTILISATEURS DÉCONNECTÉS
                     if (clientId == excludeClientId || !activeClientIds.Contains(clientId)) continue;
 
                     string statePath = Path.Combine(dir, "state.json");

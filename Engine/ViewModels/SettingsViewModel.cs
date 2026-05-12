@@ -148,7 +148,6 @@ namespace EasySave.ViewModels
             {
                 if (CurrentSettings != null && value != null)
                 {
-                    // Correction : On traite les points comme des séparateurs pour gérer les oublis de ";" (ex: .txt.pdf)
                     var extensions = value.Replace(".", ";.")
                                           .Split(new[] { ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
                                           .Select(e => e.Trim())
@@ -171,7 +170,6 @@ namespace EasySave.ViewModels
             {
                 if (CurrentSettings != null && value != null)
                 {
-                    // Correction : On traite les points comme des séparateurs pour gérer les oublis de ";" (ex: .txt.pdf)
                     var extensions = value.Replace(".", ";.")
                                           .Split(new[] { ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
                                           .Select(e => e.Trim())

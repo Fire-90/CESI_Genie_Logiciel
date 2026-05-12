@@ -38,7 +38,6 @@ namespace EasySave.ViewModels
             SettingsVM = new SettingsViewModel(_configManager, LanguageService, JobVM);
             NetworkVM = new NetworkViewModel(_networkService, _stateTracker, _configManager, LanguageService, _syncContext);
 
-            // RELAIS : On envoie les messages réseau vers la barre d'activité
             NetworkVM.OnNewRemoteActivity += (msg) => { JobVM.ExternalActivityUpdate(msg); };
 
             ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);

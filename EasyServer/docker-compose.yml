@@ -7,6 +7,5 @@ services:
     environment:
       - DOTNET_RUNNING_IN_CONTAINER=true
     volumes:
-      # Lie le dossier local ./data au dossier /App/data du conteneur
       - ./data:/App/data
     restart: unless-stopped

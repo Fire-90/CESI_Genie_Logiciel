@@ -9,13 +9,11 @@ namespace CryptoSoft
     {
         static int Main(string[] args)
         {
-            // Mutex nommé "Global\CryptoSoft_Mutex" pour garantir qu'une seule instance s'exécute à la fois sur l'OS
             bool createdNew;
             using (Mutex mutex = new Mutex(true, "Global\\CryptoSoft_Mutex", out createdNew))
             {
                 if (!createdNew)
                 {
-                    // Le Mutex est déjà possédé par un autre processus CryptoSoft, on quitte.
                     return -2;
                 }
 
@@ -27,7 +25,6 @@ namespace CryptoSoft
                 string sourceFile = args[0];
                 string targetFile = args[1];
 
-                // Récupère la clé depuis le 3ème argument ou utilise une valeur par défaut
                 string key = args.Length >= 3 ? args[2] : "EasySaveKey";
                 if (string.IsNullOrWhiteSpace(key)) key = "EasySaveKey";
 
@@ -57,7 +54,7 @@ namespace CryptoSoft
                 {
                     return -1;
                 }
-            } // Le Mutex est relâché automatiquement à la fin du bloc using
+            }
         }
     }
 }

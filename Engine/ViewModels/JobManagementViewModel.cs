@@ -64,25 +64,22 @@ namespace EasySave.ViewModels
         {
             string displayMsg = rawMessage;
 
-            // Traduction des tags pour l'affichage local
             if (rawMessage.Contains(": START")) displayMsg = rawMessage.Replace(": START", " : " + LanguageService["StateActive"]);
             else if (rawMessage.Contains(": END")) displayMsg = rawMessage.Replace(": END", " : " + LanguageService["StateFinished"]);
 
             if (_uiContext != null) _uiContext.Post(_ => CurrentFile = displayMsg, null);
             else CurrentFile = displayMsg;
 
-            // ENVOI RÉSEAU : On envoie les messages de statut (uniquement les messages filtrés)
             if (rawMessage.Contains(": START")) _networkService.SendMessage($"[START] {rawMessage.Split(':')[0].Trim()}");
             else if (rawMessage.Contains(": END")) _networkService.SendMessage($"[END] {rawMessage.Split(':')[0].Trim()}");
             else if (rawMessage.Contains(": ERREUR") || rawMessage.Contains(": ERROR")) _networkService.SendMessage($"[ERROR] {rawMessage}");
-            else _networkService.SendMessage($"[PROGRESS] {rawMessage}"); // Pour les blocages et pauses
+            else _networkService.SendMessage($"[PROGRESS] {rawMessage}");
         }
 
         private void RegisterEngineEvents()
         {
             _backupEngine.OnProgressUpdate += (file, remaining) =>
             {
-                // PLUS D'AFFICHAGE DE FICHIER ICI (uniquement progression visuelle par le thread Progression)
             };
 
             _backupEngine.OnActivityMessage += (message) =>
@@ -94,7 +91,6 @@ namespace EasySave.ViewModels
             {
                 Action action = () =>
                 {
-                    // Synchronise l'état de suspension métier pour tous les travaux en cours d'exécution
                     foreach (var jobVm in Jobs.Where(j => j.IsRunning))
                     {
                         jobVm.IsSoftwareSuspended = isSuspended;

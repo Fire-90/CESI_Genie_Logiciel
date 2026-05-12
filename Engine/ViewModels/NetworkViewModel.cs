@@ -20,7 +20,7 @@ namespace EasySave.ViewModels
         private readonly SynchronizationContext _syncContext;
 
         public LanguageService LanguageService { get; }
-        public event Action<string> OnNewRemoteActivity; // Signal pour la barre d'activité
+        public event Action<string> OnNewRemoteActivity;
 
         private ConnectionStatus _currentConnectionStatus = ConnectionStatus.Disconnected;
 
@@ -66,7 +66,6 @@ namespace EasySave.ViewModels
                     string rClientId = parts[1];
                     string rJobName = parts[2].Trim();
 
-                    // NOTIFICATION D'ACTIVITÉ RÉSEAU
                     string uiMsg = "";
                     if (message.StartsWith("[START]")) uiMsg = $"[{rClientId}] {rJobName} : START";
                     if (message.StartsWith("[END]")) uiMsg = $"[{rClientId}] {rJobName} : END";

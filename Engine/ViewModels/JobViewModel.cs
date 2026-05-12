@@ -68,7 +68,6 @@ namespace EasySave.ViewModels
             set { _isBlocked = value; OnPropertyChanged(nameof(IsBlocked)); }
         }
 
-        // PAUSE MANUELLE (Utilisateur)
         private bool _isPaused;
         public bool IsPaused
         {
@@ -76,7 +75,6 @@ namespace EasySave.ViewModels
             set { _isPaused = value; OnPropertyChanged(nameof(IsPaused)); }
         }
 
-        // PAUSE AUTOMATIQUE (Logiciel métier)
         private bool _isSoftwareSuspended;
         public bool IsSoftwareSuspended
         {
