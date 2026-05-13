@@ -27,7 +27,7 @@
 
                             <StackPanel Margin="0,0,0,15">
                                 <TextBlock Text="{Binding LanguageService[LblLanguage]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <ComboBox SelectedValue="{Binding LanguageService.CurrentLanguage, Mode=TwoWay}" SelectedValuePath="Content" Height="30" Padding="5" VerticalContentAlignment="Center">
+                                <ComboBox SelectedValue="{Binding Language, Mode=TwoWay}" SelectedValuePath="Content" Height="30" Padding="5" VerticalContentAlignment="Center">
                                     <ComboBoxItem Content="FR"/>
                                     <ComboBoxItem Content="EN"/>
                                 </ComboBox>
@@ -35,7 +35,7 @@
 
                             <StackPanel Margin="0,0,0,15">
                                 <TextBlock Text="{Binding LanguageService[LblPauseBehavior]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <ComboBox SelectedValue="{Binding CurrentSettings.PauseBehavior, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
+                                <ComboBox SelectedValue="{Binding PauseBehavior, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
                                     <ComboBoxItem Content="{Binding LanguageService[PauseImmediate]}" Tag="Immediate"/>
                                     <ComboBoxItem Content="{Binding LanguageService[PauseAfterFile]}" Tag="AfterFile"/>
                                 </ComboBox>
@@ -43,7 +43,7 @@
 
                             <StackPanel Margin="0,0,0,15">
                                 <TextBlock Text="{Binding LanguageService[LblLogFormat]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <ComboBox SelectedValue="{Binding CurrentSettings.LogFormat, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
+                                <ComboBox SelectedValue="{Binding LogFormat, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
                                     <ComboBoxItem Content="JSON" Tag="json"/>
                                     <ComboBoxItem Content="XML" Tag="xml"/>
                                 </ComboBox>
@@ -51,7 +51,7 @@
 
                             <StackPanel Margin="0,0,0,15">
                                 <TextBlock Text="{Binding LanguageService[LblLogDestination]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <ComboBox SelectedValue="{Binding CurrentSettings.LogDestination, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
+                                <ComboBox SelectedValue="{Binding LogDestination, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
                                     <ComboBoxItem Content="{Binding LanguageService[LogDestLocal]}" Tag="LocalOnly"/>
                                     <ComboBoxItem Content="{Binding LanguageService[LogDestServer]}" Tag="ServerOnly"/>
                                     <ComboBoxItem Content="{Binding LanguageService[LogDestBoth]}" Tag="LocalAndServer"/>
@@ -70,12 +70,12 @@
 
                             <StackPanel Margin="0,0,0,15">
                                 <TextBlock Text="{Binding LanguageService[LblServerIP]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <TextBox Text="{Binding CurrentSettings.ServerIP, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+                                <TextBox Text="{Binding ServerIP, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,0,0,10">
                                 <TextBlock Text="{Binding LanguageService[LblClientName]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <TextBox Text="{Binding CurrentSettings.ClientName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+                                <TextBox Text="{Binding ClientName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -97,14 +97,14 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="60"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Grid.Column="0" Text="{Binding CurrentSettings.MaxParallelFileSizeLimit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableSizeUnits}" SelectedItem="{Binding CurrentSettings.MaxParallelFileSizeLimitUnit, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+                                    <TextBox Grid.Column="0" Text="{Binding MaxParallelFileSizeLimit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableSizeUnits}" SelectedItem="{Binding MaxParallelFileSizeLimitUnit, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
                                 </Grid>
                             </StackPanel>
 
                             <StackPanel Margin="0,0,0,15">
                                 <TextBlock Text="{Binding LanguageService[LblEncryptionKey]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <TextBox Text="{Binding CurrentSettings.EncryptionKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+                                <TextBox Text="{Binding EncryptionKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,0,0,15">

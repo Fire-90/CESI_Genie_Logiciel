@@ -16,7 +16,65 @@ namespace EasySave.ViewModels
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
 
+        public List<string> AvailableLogFormats { get; } = new List<string> { "JSON", "XML" };
+        public List<string> AvailableLogDestinations { get; } = new List<string> { "LocalOnly", "ServerOnly", "LocalAndServer" };
         public List<string> AvailableSizeUnits { get; } = new List<string> { "Ko", "Mo", "Go" };
+
+        // --- ENCAPSULATION DES PARAMÈTRES POUR FORCER LA SAUVEGARDE EN TEMPS RÉEL ---
+
+        public string Language
+        {
+            get => CurrentSettings.Language;
+            set { CurrentSettings.Language = value; LanguageService.CurrentLanguage = value; OnPropertyChanged(nameof(Language)); SaveConfig(); }
+        }
+
+        public string PauseBehavior
+        {
+            get => CurrentSettings.PauseBehavior;
+            set { CurrentSettings.PauseBehavior = value; OnPropertyChanged(nameof(PauseBehavior)); SaveConfig(); }
+        }
+
+        public string LogFormat
+        {
+            get => CurrentSettings.LogFormat;
+            set { CurrentSettings.LogFormat = value; OnPropertyChanged(nameof(LogFormat)); SaveConfig(); }
+        }
+
+        public string LogDestination
+        {
+            get => CurrentSettings.LogDestination;
+            set { CurrentSettings.LogDestination = value; OnPropertyChanged(nameof(LogDestination)); SaveConfig(); }
+        }
+
+        public string ServerIP
+        {
+            get => CurrentSettings.ServerIP;
+            set { CurrentSettings.ServerIP = value; OnPropertyChanged(nameof(ServerIP)); SaveConfig(); }
+        }
+
+        public string ClientName
+        {
+            get => CurrentSettings.ClientName;
+            set { CurrentSettings.ClientName = value; OnPropertyChanged(nameof(ClientName)); SaveConfig(); }
+        }
+
+        public long MaxParallelFileSizeLimit
+        {
+            get => CurrentSettings.MaxParallelFileSizeLimit;
+            set { CurrentSettings.MaxParallelFileSizeLimit = value; OnPropertyChanged(nameof(MaxParallelFileSizeLimit)); SaveConfig(); }
+        }
+
+        public string MaxParallelFileSizeLimitUnit
+        {
+            get => CurrentSettings.MaxParallelFileSizeLimitUnit;
+            set { CurrentSettings.MaxParallelFileSizeLimitUnit = value; OnPropertyChanged(nameof(MaxParallelFileSizeLimitUnit)); SaveConfig(); }
+        }
+
+        public string EncryptionKey
+        {
+            get => CurrentSettings.EncryptionKey;
+            set { CurrentSettings.EncryptionKey = value; OnPropertyChanged(nameof(EncryptionKey)); SaveConfig(); }
+        }
 
         private string _newSoftware;
         public string NewSoftware
@@ -71,20 +129,12 @@ namespace EasySave.ViewModels
             AddSoftwareCommand = new RelayViewModel(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayViewModel(ExecuteRemoveSoftware);
 
-            // Mise à jour de la langue initiale
             LanguageService.CurrentLanguage = CurrentSettings.Language;
         }
 
         private void ExecuteChangeLanguage(object param)
         {
-            string lang = param as string ?? "EN";
-            CurrentSettings.Language = lang;
-            if (_jobVM != null)
-            {
-                CurrentSettings.Jobs = _jobVM.Jobs.Select(j => j.Model).ToList();
-            }
-            _configManager.SaveSettings(CurrentSettings);
-            LanguageService.CurrentLanguage = lang;
+            if (param is string lang) Language = lang;
         }
 
         private void ExecuteAddSoftware(object parameter)

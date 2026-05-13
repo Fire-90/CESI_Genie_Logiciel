@@ -31,7 +31,6 @@ namespace EasySave.ViewModels
 
         public ICommand RefreshProcessesCommand { get; }
 
-        // Observer
         public NetworkViewModel(NetworkService networkService, StateService stateTracker, SettingService configManager, LanguageService languageService, SynchronizationContext syncContext)
         {
             _networkService = networkService;
@@ -121,7 +120,18 @@ namespace EasySave.ViewModels
                                         case "END": pj.State = LanguageService["StateFinished"]; break;
                                         case "BLOCKED": pj.State = LanguageService["StateBlocked"]; break;
                                         case "SUSPENDED": pj.State = LanguageService["StateSuspended"]; break;
+                                        case "PAUSE_PENDING": pj.State = LanguageService["StatePausePending"]; break;
                                         case "WAITING": pj.State = LanguageService["StateWaiting"]; break;
+                                    }
+
+                                    // Traduction distante de la vitesse/chiffrement
+                                    if (pj.CurrentSpeed == "ENCRYPTING")
+                                    {
+                                        pj.CurrentSpeed = LanguageService["StateEncrypting"];
+                                    }
+                                    else if (!string.IsNullOrEmpty(pj.CurrentSpeed) && pj.CurrentSpeed.Contains("Mo/s") && LanguageService.CurrentLanguage == "EN")
+                                    {
+                                        pj.CurrentSpeed = pj.CurrentSpeed.Replace("Mo/s", "MB/s");
                                     }
                                 }
                                 parsedClientStates[kvp.Key] = parsedJobs;

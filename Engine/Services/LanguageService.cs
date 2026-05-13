@@ -86,6 +86,7 @@ namespace EasySave.Services
                 { "MsgJobStopped", "Job stopped." },
                 { "MsgManualPause", "MANUAL PAUSE" },
                 { "MsgPausePending", "PAUSE SCHEDULED" },
+                { "MsgPausePendingInfo", "Finishing current file before pausing..." },
                 { "MsgResume", "RESUME" },
                 { "MsgForceStop", "FORCED STOP" },
 
@@ -159,6 +160,7 @@ namespace EasySave.Services
                 { "MsgJobStopped", "Sauvegarde interrompue." },
                 { "MsgManualPause", "PAUSE MANUELLE" },
                 { "MsgPausePending", "PAUSE PROGRAMMÉE" },
+                { "MsgPausePendingInfo", "Mise en pause à la fin du fichier en cours..." },
                 { "MsgResume", "REPRISE" },
                 { "MsgForceStop", "ARRÊT FORCÉ" },
 

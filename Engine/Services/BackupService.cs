@@ -16,7 +16,6 @@ namespace EasySave.Services
         public event Action<string, bool, string> OnJobSuspendedBySoftware;
         public event Action<string> OnActivityMessage;
 
-        // Nouvel event qui signale quand le Job est réellement arrêté (pour le comportement "Après Fichier")
         public event Action<string> OnJobActuallyPaused;
 
         private readonly StateService _stateTracker;
@@ -55,15 +54,27 @@ namespace EasySave.Services
                     var settings = _configManager.LoadSettings();
                     if (settings.PauseBehavior != "AfterFile")
                     {
-                        // Efface la vitesse uniquement si la pause est immédiate.
                         lock (_stateLock)
                         {
                             _stateTracker.UpdateState(jobName, s =>
                             {
+                                s.State = "SUSPENDED";
                                 s.CurrentSpeed = "";
                                 OnJobProgress?.Invoke(jobName, s.Progression, s.CurrentSpeed);
                             });
                         }
+                    }
+                    else
+                    {
+                        // Transmission du statut "PAUSE_PENDING" pour le réseau et mise à jour locale
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(jobName, s =>
+                            {
+                                s.State = "PAUSE_PENDING";
+                            });
+                        }
+                        OnActivityMessage?.Invoke($"{jobName} : PAUSE_PENDING");
                     }
                 }
             }
@@ -78,6 +89,7 @@ namespace EasySave.Services
                     if (_priorityFilesRemainingPerJob.TryGetValue(jobName, out int remaining))
                         Interlocked.Add(ref PausedPriorityFilesCount, -remaining);
                     pauseEvent.Set();
+                    lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "ACTIVE"); }
                 }
             }
         }
@@ -175,11 +187,20 @@ namespace EasySave.Services
                 {
                     await CheckAndWaitForBusinessSoftwareAsync(job.Name, cts.Token);
 
-                    // Si nous sommes arrêtés MANUELLEMENT entre deux fichiers
                     if (_jobPauseEvents.TryGetValue(job.Name, out var pe) && !pe.WaitOne(0))
                     {
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(job.Name, s =>
+                            {
+                                s.State = "SUSPENDED";
+                                s.CurrentSpeed = "";
+                                OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed);
+                            });
+                        }
                         OnJobActuallyPaused?.Invoke(job.Name);
                         pe.WaitOne();
+                        lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE"); }
                     }
                     cts.Token.ThrowIfCancellationRequested();
 
@@ -206,8 +227,18 @@ namespace EasySave.Services
 
                     if (_jobPauseEvents.TryGetValue(job.Name, out var pe) && !pe.WaitOne(0))
                     {
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(job.Name, s =>
+                            {
+                                s.State = "SUSPENDED";
+                                s.CurrentSpeed = "";
+                                OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed);
+                            });
+                        }
                         OnJobActuallyPaused?.Invoke(job.Name);
                         pe.WaitOne();
+                        lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "ACTIVE"); }
                     }
                     cts.Token.ThrowIfCancellationRequested();
 
@@ -388,7 +419,6 @@ namespace EasySave.Services
                     bool hasBusinessSoftware = GetRunningBusinessSoftware() != null;
                     bool isManuallyPaused = _jobPauseEvents.TryGetValue(job.Name, out var pe) && !pe.WaitOne(0);
 
-                    // Si nous somme en comportement "Après Fichier", nous ignorons les pauses manuelles DANS la boucle.
                     if (hasBusinessSoftware || (isManuallyPaused && !pauseAfterFile))
                     {
                         wasPaused = true;

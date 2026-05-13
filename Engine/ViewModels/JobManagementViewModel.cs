@@ -59,6 +59,7 @@ namespace EasySave.ViewModels
 
             if (message.Contains(": START")) displayMsg = message.Replace(": START", " : " + LanguageService["StateActive"]);
             else if (message.Contains(": END")) displayMsg = message.Replace(": END", " : " + LanguageService["StateFinished"]);
+            else if (message.Contains(": PAUSE_PENDING")) displayMsg = message.Replace(": PAUSE_PENDING", " : " + LanguageService["MsgPausePendingInfo"]);
 
             if (_uiContext != null) _uiContext.Post(_ => CurrentFile = displayMsg, null);
             else CurrentFile = displayMsg;
@@ -70,12 +71,14 @@ namespace EasySave.ViewModels
 
             if (rawMessage.Contains(": START")) displayMsg = rawMessage.Replace(": START", " : " + LanguageService["StateActive"]);
             else if (rawMessage.Contains(": END")) displayMsg = rawMessage.Replace(": END", " : " + LanguageService["StateFinished"]);
+            else if (rawMessage.Contains(": PAUSE_PENDING")) displayMsg = rawMessage.Replace(": PAUSE_PENDING", " : " + LanguageService["MsgPausePendingInfo"]);
 
             if (_uiContext != null) _uiContext.Post(_ => CurrentFile = displayMsg, null);
             else CurrentFile = displayMsg;
 
             if (rawMessage.Contains(": START")) _networkService.SendMessage($"[START] {rawMessage.Split(':')[0].Trim()}");
             else if (rawMessage.Contains(": END")) _networkService.SendMessage($"[END] {rawMessage.Split(':')[0].Trim()}");
+            else if (rawMessage.Contains(": PAUSE_PENDING")) _networkService.SendMessage($"[PROGRESS] {rawMessage}");
             else if (rawMessage.Contains(": ERREUR") || rawMessage.Contains(": ERROR")) _networkService.SendMessage($"[ERROR] {rawMessage}");
             else _networkService.SendMessage($"[PROGRESS] {rawMessage}");
         }
@@ -101,6 +104,22 @@ namespace EasySave.ViewModels
             _backupEngine.OnJobBlocked += (jobName, isBlocked) =>
             {
                 Action action = () => { var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName); if (jobVm != null) jobVm.IsBlocked = isBlocked; };
+                if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
+            };
+
+            _backupEngine.OnJobActuallyPaused += (jobName) =>
+            {
+                Action action = () =>
+                {
+                    var jobVm = Jobs.FirstOrDefault(j => j.Name == jobName);
+                    if (jobVm != null && jobVm.IsPausePending)
+                    {
+                        jobVm.IsPausePending = false;
+                        jobVm.IsPaused = true;
+                        jobVm.CurrentSpeed = "";
+                        UpdateActivityBar($"{jobName} : {LanguageService["MsgManualPause"]}");
+                    }
+                };
                 if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
             };
 
@@ -131,7 +150,7 @@ namespace EasySave.ViewModels
             };
         }
 
-        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e) { if (e.PropertyName == "Progress" || e.PropertyName == "CurrentSpeed" || e.PropertyName == "IsSelected" || e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked" || e.PropertyName == "IsSoftwareSuspended" || e.PropertyName == "IsFinished" || e.PropertyName == "IsCanceled") return; SaveConfig(); }
+        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e) { if (e.PropertyName == "Progress" || e.PropertyName == "CurrentSpeed" || e.PropertyName == "IsSelected" || e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsPausePending" || e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked" || e.PropertyName == "IsSoftwareSuspended" || e.PropertyName == "IsFinished" || e.PropertyName == "IsCanceled") return; SaveConfig(); }
 
         public void SaveConfig() { var settings = _configManager.LoadSettings(); settings.Jobs = Jobs.Select(j => j.Model).ToList(); _configManager.SaveSettings(settings); }
 
@@ -145,7 +164,7 @@ namespace EasySave.ViewModels
                 foreach (var jobVm in jobsToRun)
                 {
                     if (string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
-                    jobVm.Progress = 0; jobVm.CurrentSpeed = ""; jobVm.IsRunning = true; jobVm.IsFinished = false; jobVm.IsCanceled = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
+                    jobVm.Progress = 0; jobVm.CurrentSpeed = ""; jobVm.IsRunning = true; jobVm.IsFinished = false; jobVm.IsCanceled = false; jobVm.IsPaused = false; jobVm.IsPausePending = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
                     _ = Task.Run(async () =>
                     {
                         bool wasCanceled = false;
@@ -163,6 +182,7 @@ namespace EasySave.ViewModels
                                 jobVm.IsWaiting = false;
                                 jobVm.IsBlocked = false;
                                 jobVm.IsPaused = false;
+                                jobVm.IsPausePending = false;
                                 jobVm.IsSoftwareSuspended = false;
                                 jobVm.IsRunning = false;
                                 jobVm.CurrentSpeed = "";
@@ -206,7 +226,7 @@ namespace EasySave.ViewModels
                 {
                     var jobVm = Jobs.FirstOrDefault(j => j.Id == id);
                     if (jobVm == null || string.IsNullOrWhiteSpace(jobVm.SourceDirectory) || string.IsNullOrWhiteSpace(jobVm.TargetDirectory)) continue;
-                    jobVm.Progress = 0; jobVm.CurrentSpeed = ""; jobVm.IsRunning = true; jobVm.IsFinished = false; jobVm.IsCanceled = false; jobVm.IsPaused = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
+                    jobVm.Progress = 0; jobVm.CurrentSpeed = ""; jobVm.IsRunning = true; jobVm.IsFinished = false; jobVm.IsCanceled = false; jobVm.IsPaused = false; jobVm.IsPausePending = false; jobVm.IsSoftwareSuspended = _backupEngine.GetRunningBusinessSoftware() != null;
 
                     bool wasCanceled = false;
                     try { await _backupEngine.ExecuteJobAsync(jobVm.Model); }
@@ -221,6 +241,7 @@ namespace EasySave.ViewModels
                         jobVm.IsWaiting = false;
                         jobVm.IsBlocked = false;
                         jobVm.IsPaused = false;
+                        jobVm.IsPausePending = false;
                         jobVm.IsSoftwareSuspended = false;
                         jobVm.IsRunning = false;
                         jobVm.CurrentSpeed = "";
@@ -256,10 +277,20 @@ namespace EasySave.ViewModels
         {
             if (parameter is JobViewModel job)
             {
+                var settings = _configManager.LoadSettings();
                 _backupEngine.PauseJob(job.Name);
-                job.IsPaused = true;
-                job.CurrentSpeed = "";
-                UpdateActivityBar($"{job.Name} : {LanguageService["MsgManualPause"]}");
+
+                if (settings.PauseBehavior == "AfterFile")
+                {
+                    job.IsPausePending = true;
+                    // Le BackupService déclenchera "PAUSE_PENDING" pour mettre à jour la barre d'historique
+                }
+                else
+                {
+                    job.IsPaused = true;
+                    job.CurrentSpeed = "";
+                    UpdateActivityBar($"{job.Name} : {LanguageService["MsgManualPause"]}");
+                }
             }
         }
 
@@ -270,6 +301,7 @@ namespace EasySave.ViewModels
                 if (_backupEngine.GetRunningBusinessSoftware() != null) { CurrentFile = LanguageService["MsgBlockingSoftware"]; return; }
                 _backupEngine.ResumeJob(job.Name);
                 job.IsPaused = false;
+                job.IsPausePending = false;
                 UpdateActivityBar($"{job.Name} : {LanguageService["MsgResume"]}");
             }
         }
