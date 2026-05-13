@@ -82,6 +82,13 @@ namespace EasySave.ViewModels
             set { _isPaused = value; OnPropertyChanged(nameof(IsPaused)); }
         }
 
+        private bool _isPausePending;
+        public bool IsPausePending
+        {
+            get => _isPausePending;
+            set { _isPausePending = value; OnPropertyChanged(nameof(IsPausePending)); }
+        }
+
         private bool _isSoftwareSuspended;
         public bool IsSoftwareSuspended
         {
@@ -104,7 +111,6 @@ namespace EasySave.ViewModels
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged(string propertyName) =>
-          PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        protected void OnPropertyChanged(string propertyName) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

@@ -9,13 +9,15 @@ namespace EasySave.Services
     {
         public delegate void ProgressUpdateHandler(string currentFile, int remainingFiles);
 
-        // Observer
         public event ProgressUpdateHandler OnProgressUpdate;
         public event Action<string, int, string> OnJobProgress;
         public event Action<string, bool> OnJobWaiting;
         public event Action<string, bool> OnJobBlocked;
         public event Action<string, bool, string> OnJobSuspendedBySoftware;
         public event Action<string> OnActivityMessage;
+
+        // Nouvel event qui signale quand le Job est réellement arrêté (pour le comportement "Après Fichier")
+        public event Action<string> OnJobActuallyPaused;
 
         private readonly StateService _stateTracker;
         private readonly SettingService _configManager;
@@ -25,7 +27,6 @@ namespace EasySave.Services
         private static int PausedPriorityFilesCount = 0;
         private readonly ConcurrentDictionary<string, int> _priorityFilesRemainingPerJob = new();
 
-        // Concurrence
         private static readonly SemaphoreSlim _cryptoSoftLock = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim _largeFileLock = new SemaphoreSlim(1, 1);
 
@@ -50,6 +51,20 @@ namespace EasySave.Services
                     pauseEvent.Reset();
                     if (_priorityFilesRemainingPerJob.TryGetValue(jobName, out int remaining))
                         Interlocked.Add(ref PausedPriorityFilesCount, remaining);
+
+                    var settings = _configManager.LoadSettings();
+                    if (settings.PauseBehavior != "AfterFile")
+                    {
+                        // Efface la vitesse uniquement si la pause est immédiate.
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(jobName, s =>
+                            {
+                                s.CurrentSpeed = "";
+                                OnJobProgress?.Invoke(jobName, s.Progression, s.CurrentSpeed);
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -102,7 +117,16 @@ namespace EasySave.Services
                 {
                     wasSuspendedBySoftware = true;
                     OnJobSuspendedBySoftware?.Invoke(jobName, true, blocking);
-                    lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "SUSPENDED"); }
+
+                    lock (_stateLock)
+                    {
+                        _stateTracker.UpdateState(jobName, s =>
+                        {
+                            s.State = "SUSPENDED";
+                            s.CurrentSpeed = "";
+                            OnJobProgress?.Invoke(jobName, s.Progression, s.CurrentSpeed);
+                        });
+                    }
                     OnActivityMessage?.Invoke($"{jobName} : PAUSE (Logiciel métier : {blocking})");
                 }
                 await Task.Delay(1000, token);
@@ -150,7 +174,13 @@ namespace EasySave.Services
                 foreach (string file in priorityFiles)
                 {
                     await CheckAndWaitForBusinessSoftwareAsync(job.Name, cts.Token);
-                    pauseEvent.WaitOne();
+
+                    // Si nous sommes arrêtés MANUELLEMENT entre deux fichiers
+                    if (_jobPauseEvents.TryGetValue(job.Name, out var pe) && !pe.WaitOne(0))
+                    {
+                        OnJobActuallyPaused?.Invoke(job.Name);
+                        pe.WaitOne();
+                    }
                     cts.Token.ThrowIfCancellationRequested();
 
                     try { await ProcessSingleFileAsync(file, job, cts.Token); }
@@ -173,8 +203,14 @@ namespace EasySave.Services
                 foreach (string file in normalFiles)
                 {
                     await CheckAndWaitForBusinessSoftwareAsync(job.Name, cts.Token);
-                    pauseEvent.WaitOne();
+
+                    if (_jobPauseEvents.TryGetValue(job.Name, out var pe) && !pe.WaitOne(0))
+                    {
+                        OnJobActuallyPaused?.Invoke(job.Name);
+                        pe.WaitOne();
+                    }
                     cts.Token.ThrowIfCancellationRequested();
+
                     await ProcessSingleFileAsync(file, job, cts.Token);
                 }
             }
@@ -195,7 +231,6 @@ namespace EasySave.Services
                 _jobSpeedStopwatches.TryRemove(job.Name, out _);
                 _jobBytesSinceLastUpdate.TryRemove(job.Name, out _);
 
-                // FINISHED permet une traduction propre côté client (au lieu de END qui s'affichait brut)
                 lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "FINISHED"; s.Progression = 100; s.CurrentSpeed = ""; }); }
                 OnJobProgress?.Invoke(job.Name, 100, "");
 
@@ -262,7 +297,15 @@ namespace EasySave.Services
                     else
                     {
                         OnJobBlocked?.Invoke(job.Name, true);
-                        lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED"); }
+                        lock (_stateLock)
+                        {
+                            _stateTracker.UpdateState(job.Name, s =>
+                            {
+                                s.State = "BLOCKED";
+                                s.CurrentSpeed = "";
+                                OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed);
+                            });
+                        }
                         OnActivityMessage?.Invoke($"{job.Name} : BLOQUÉ (Limite de taille dépassée par {Path.GetFileName(source)})");
 
                         while (true)
@@ -330,6 +373,8 @@ namespace EasySave.Services
         private async Task CopyFileAsync(string source, string target, BackupJob job, long fileSize, CancellationToken token, bool isLargeFile, Action<bool> updateLockStatus)
         {
             byte[] buffer = new byte[1024 * 1024];
+            bool pauseAfterFile = _configManager.LoadSettings().PauseBehavior == "AfterFile";
+
             using (FileStream sourceStream = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (FileStream targetStream = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None))
             {
@@ -343,7 +388,8 @@ namespace EasySave.Services
                     bool hasBusinessSoftware = GetRunningBusinessSoftware() != null;
                     bool isManuallyPaused = _jobPauseEvents.TryGetValue(job.Name, out var pe) && !pe.WaitOne(0);
 
-                    if (hasBusinessSoftware || isManuallyPaused)
+                    // Si nous somme en comportement "Après Fichier", nous ignorons les pauses manuelles DANS la boucle.
+                    if (hasBusinessSoftware || (isManuallyPaused && !pauseAfterFile))
                     {
                         wasPaused = true;
 
@@ -354,7 +400,7 @@ namespace EasySave.Services
                         }
 
                         if (hasBusinessSoftware) await CheckAndWaitForBusinessSoftwareAsync(job.Name, token);
-                        if (_jobPauseEvents.TryGetValue(job.Name, out var evWait)) evWait.WaitOne();
+                        if (!pauseAfterFile && _jobPauseEvents.TryGetValue(job.Name, out var evWait)) evWait.WaitOne();
                         token.ThrowIfCancellationRequested();
 
                         if (isLargeFile)
@@ -364,12 +410,12 @@ namespace EasySave.Services
                             {
                                 token.ThrowIfCancellationRequested();
 
-                                bool stillNeedsWait = GetRunningBusinessSoftware() != null || (_jobPauseEvents.TryGetValue(job.Name, out var pe2) && !pe2.WaitOne(0));
+                                bool stillNeedsWait = GetRunningBusinessSoftware() != null || (!pauseAfterFile && _jobPauseEvents.TryGetValue(job.Name, out var pe2) && !pe2.WaitOne(0));
                                 if (stillNeedsWait)
                                 {
                                     if (blockedEventFired) { OnJobBlocked?.Invoke(job.Name, false); blockedEventFired = false; }
                                     await CheckAndWaitForBusinessSoftwareAsync(job.Name, token);
-                                    if (_jobPauseEvents.TryGetValue(job.Name, out var evWait2)) evWait2.WaitOne();
+                                    if (!pauseAfterFile && _jobPauseEvents.TryGetValue(job.Name, out var evWait2)) evWait2.WaitOne();
                                     continue;
                                 }
 
@@ -387,7 +433,15 @@ namespace EasySave.Services
                                 {
                                     blockedEventFired = true;
                                     OnJobBlocked?.Invoke(job.Name, true);
-                                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => s.State = "BLOCKED"); }
+                                    lock (_stateLock)
+                                    {
+                                        _stateTracker.UpdateState(job.Name, s =>
+                                        {
+                                            s.State = "BLOCKED";
+                                            s.CurrentSpeed = "";
+                                            OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed);
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -480,7 +534,7 @@ namespace EasySave.Services
                 {
                     _stateTracker.UpdateState(jobName, s =>
                     {
-                        s.CurrentSpeed = "Chiffrement...";
+                        s.CurrentSpeed = "ENCRYPTING";
                         OnJobProgress?.Invoke(jobName, s.Progression, s.CurrentSpeed);
                     });
                 }

@@ -48,7 +48,7 @@
                     </DataGridCheckBoxColumn.ElementStyle>
                 </DataGridCheckBoxColumn>
 
-                <DataGridTemplateColumn Width="110">
+                <DataGridTemplateColumn Width="130">
                     <DataGridTemplateColumn.HeaderTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DataContext.LanguageService[LblStatus], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
@@ -56,7 +56,7 @@
                     </DataGridTemplateColumn.HeaderTemplate>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Left">
+                            <TextBlock FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Left" TextWrapping="Wrap">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateInactive], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
@@ -73,6 +73,10 @@
                                             <DataTrigger Binding="{Binding IsBlocked}" Value="True">
                                                 <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateBlocked], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                                                 <Setter Property="Foreground" Value="#E67E22"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsPausePending}" Value="True">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[StatePausePending], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                                <Setter Property="Foreground" Value="#F39C12"/>
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding IsPaused}" Value="True">
                                                 <Setter Property="Text" Value="{Binding DataContext.LanguageService[StateSuspended], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
@@ -167,6 +171,9 @@
                                                 <DataTrigger Binding="{Binding IsPaused}" Value="True">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                 </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsPausePending}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                 </DataTrigger>
@@ -185,6 +192,9 @@
                                             <Setter Property="Opacity" Value="1.0"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsPausePending}" Value="True">
                                                     <Setter Property="Visibility" Value="Visible"/>
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">

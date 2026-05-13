@@ -112,7 +112,19 @@ namespace EasySave.ViewModels
                     if (jobVm != null)
                     {
                         jobVm.Progress = progress;
-                        jobVm.CurrentSpeed = speed;
+
+                        if (speed == "ENCRYPTING")
+                        {
+                            jobVm.CurrentSpeed = LanguageService["StateEncrypting"];
+                        }
+                        else if (!string.IsNullOrEmpty(speed) && speed.Contains("Mo/s") && LanguageService.CurrentLanguage == "EN")
+                        {
+                            jobVm.CurrentSpeed = speed.Replace("Mo/s", "MB/s");
+                        }
+                        else
+                        {
+                            jobVm.CurrentSpeed = speed;
+                        }
                     }
                 };
                 if (_uiContext != null) _uiContext.Post(_ => action(), null); else action();
@@ -240,9 +252,36 @@ namespace EasySave.ViewModels
             catch (Exception ex) { CurrentFile = $"{LanguageService["MsgError"]} {ex.Message}"; }
         }
 
-        private void ExecutePauseJob(object parameter) { if (parameter is JobViewModel job) { _backupEngine.PauseJob(job.Name); job.IsPaused = true; UpdateActivityBar($"{job.Name} : PAUSE MANUELLE"); } }
-        private void ExecuteResumeJob(object parameter) { if (parameter is JobViewModel job) { if (_backupEngine.GetRunningBusinessSoftware() != null) { CurrentFile = LanguageService["MsgBlockingSoftware"]; return; } _backupEngine.ResumeJob(job.Name); job.IsPaused = false; UpdateActivityBar($"{job.Name} : REPRISE"); } }
-        private void ExecuteStopJob(object parameter) { if (parameter is JobViewModel job) { _backupEngine.StopJob(job.Name); UpdateActivityBar($"{job.Name} : ARRÊT FORCÉ"); } }
+        private void ExecutePauseJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.PauseJob(job.Name);
+                job.IsPaused = true;
+                job.CurrentSpeed = "";
+                UpdateActivityBar($"{job.Name} : {LanguageService["MsgManualPause"]}");
+            }
+        }
+
+        private void ExecuteResumeJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                if (_backupEngine.GetRunningBusinessSoftware() != null) { CurrentFile = LanguageService["MsgBlockingSoftware"]; return; }
+                _backupEngine.ResumeJob(job.Name);
+                job.IsPaused = false;
+                UpdateActivityBar($"{job.Name} : {LanguageService["MsgResume"]}");
+            }
+        }
+
+        private void ExecuteStopJob(object parameter)
+        {
+            if (parameter is JobViewModel job)
+            {
+                _backupEngine.StopJob(job.Name);
+                UpdateActivityBar($"{job.Name} : {LanguageService["MsgForceStop"]}");
+            }
+        }
 
         private void ExecuteAddJob(object parameter) { int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1; var newViewModel = new JobViewModel(new BackupJob { Id = newId, Name = $"Save {newId}", SourceDirectory = "", TargetDirectory = "", Type = BackupType.Full }); newViewModel.PropertyChanged += OnJobPropertyChanged; Jobs.Add(newViewModel); SaveConfig(); SelectedJob = newViewModel; CurrentFile = LanguageService["MsgSlotAdded"]; }
 

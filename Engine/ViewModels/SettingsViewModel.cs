@@ -16,9 +16,43 @@ namespace EasySave.ViewModels
         public AppSettings CurrentSettings { get; private set; }
         public ObservableCollection<string> Softwares { get; set; }
 
-        public List<string> AvailableLogFormats { get; } = new List<string> { "JSON", "XML" };
-        public List<string> AvailableLogDestinations { get; } = new List<string> { "LocalOnly", "ServerOnly", "LocalAndServer" };
         public List<string> AvailableSizeUnits { get; } = new List<string> { "Ko", "Mo", "Go" };
+
+        private string _newSoftware;
+        public string NewSoftware
+        {
+            get => _newSoftware;
+            set { _newSoftware = value; OnPropertyChanged(nameof(NewSoftware)); }
+        }
+
+        private string _selectedSoftware;
+        public string SelectedSoftware
+        {
+            get => _selectedSoftware;
+            set { _selectedSoftware = value; OnPropertyChanged(nameof(SelectedSoftware)); }
+        }
+
+        public string EncryptedExtensionsString
+        {
+            get => string.Join(";", CurrentSettings.EncryptedExtensions);
+            set
+            {
+                CurrentSettings.EncryptedExtensions = value.Split(';', System.StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
+                OnPropertyChanged(nameof(EncryptedExtensionsString));
+                SaveConfig();
+            }
+        }
+
+        public string PriorityExtensionsString
+        {
+            get => string.Join(";", CurrentSettings.PriorityExtensions);
+            set
+            {
+                CurrentSettings.PriorityExtensions = value.Split(';', System.StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).ToList();
+                OnPropertyChanged(nameof(PriorityExtensionsString));
+                SaveConfig();
+            }
+        }
 
         public ICommand ChangeLanguageCommand { get; }
         public ICommand AddSoftwareCommand { get; }
@@ -33,166 +67,15 @@ namespace EasySave.ViewModels
             CurrentSettings = _configManager.LoadSettings();
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
 
-            ChangeLanguageCommand = new RelayViewModel(ChangeLanguage);
+            ChangeLanguageCommand = new RelayViewModel(ExecuteChangeLanguage);
             AddSoftwareCommand = new RelayViewModel(ExecuteAddSoftware);
             RemoveSoftwareCommand = new RelayViewModel(ExecuteRemoveSoftware);
 
+            // Mise à jour de la langue initiale
             LanguageService.CurrentLanguage = CurrentSettings.Language;
         }
 
-        public string SelectedLogFormat
-        {
-            get => CurrentSettings?.LogFormat?.ToUpper() ?? "JSON";
-            set
-            {
-                string newValue = value?.ToLower() ?? "json";
-                if (CurrentSettings != null && CurrentSettings.LogFormat != newValue)
-                {
-                    CurrentSettings.LogFormat = newValue;
-                    OnPropertyChanged(nameof(SelectedLogFormat));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public string SelectedLogDestination
-        {
-            get => CurrentSettings?.LogDestination ?? "LocalAndServer";
-            set
-            {
-                if (CurrentSettings != null && CurrentSettings.LogDestination != value)
-                {
-                    CurrentSettings.LogDestination = value;
-                    OnPropertyChanged(nameof(SelectedLogDestination));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public string ServerIP
-        {
-            get => CurrentSettings?.ServerIP ?? "127.0.0.1";
-            set
-            {
-                if (CurrentSettings != null && CurrentSettings.ServerIP != value)
-                {
-                    CurrentSettings.ServerIP = value;
-                    OnPropertyChanged(nameof(ServerIP));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public string ClientName
-        {
-            get => CurrentSettings?.ClientName ?? "EasySaveClient";
-            set
-            {
-                if (CurrentSettings != null && CurrentSettings.ClientName != value)
-                {
-                    CurrentSettings.ClientName = value;
-                    OnPropertyChanged(nameof(ClientName));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public long MaxParallelFileSizeLimit
-        {
-            get => CurrentSettings?.MaxParallelFileSizeLimit ?? 50000;
-            set
-            {
-                if (CurrentSettings != null && CurrentSettings.MaxParallelFileSizeLimit != value)
-                {
-                    CurrentSettings.MaxParallelFileSizeLimit = value;
-                    OnPropertyChanged(nameof(MaxParallelFileSizeLimit));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public string MaxParallelFileSizeLimitUnit
-        {
-            get => CurrentSettings?.MaxParallelFileSizeLimitUnit ?? "Ko";
-            set
-            {
-                if (CurrentSettings != null && CurrentSettings.MaxParallelFileSizeLimitUnit != value)
-                {
-                    CurrentSettings.MaxParallelFileSizeLimitUnit = value;
-                    OnPropertyChanged(nameof(MaxParallelFileSizeLimitUnit));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public string EncryptionKey
-        {
-            get => CurrentSettings?.EncryptionKey ?? "EasySaveKey";
-            set
-            {
-                if (CurrentSettings != null && CurrentSettings.EncryptionKey != value)
-                {
-                    CurrentSettings.EncryptionKey = value;
-                    OnPropertyChanged(nameof(EncryptionKey));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public string EncryptedExtensionsString
-        {
-            get => CurrentSettings?.EncryptedExtensions == null ? "" : string.Join(";", CurrentSettings.EncryptedExtensions);
-            set
-            {
-                if (CurrentSettings != null && value != null)
-                {
-                    var extensions = value.Replace(".", ";.")
-                                          .Split(new[] { ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                                          .Select(e => e.Trim())
-                                          .Where(e => !string.IsNullOrWhiteSpace(e) && e != ".")
-                                          .Select(e => e.StartsWith(".") ? e : "." + e)
-                                          .Distinct()
-                                          .ToList();
-
-                    CurrentSettings.EncryptedExtensions = extensions;
-                    OnPropertyChanged(nameof(EncryptedExtensionsString));
-                    SaveConfig();
-                }
-            }
-        }
-
-        public string PriorityExtensionsString
-        {
-            get => CurrentSettings?.PriorityExtensions == null ? "" : string.Join(";", CurrentSettings.PriorityExtensions);
-            set
-            {
-                if (CurrentSettings != null && value != null)
-                {
-                    var extensions = value.Replace(".", ";.")
-                                          .Split(new[] { ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                                          .Select(e => e.Trim())
-                                          .Where(e => !string.IsNullOrWhiteSpace(e) && e != ".")
-                                          .Select(e => e.StartsWith(".") ? e : "." + e)
-                                          .Distinct()
-                                          .ToList();
-
-                    CurrentSettings.PriorityExtensions = extensions;
-                    OnPropertyChanged(nameof(PriorityExtensionsString));
-                    SaveConfig();
-                }
-            }
-        }
-
-        private string _newSoftware;
-        public string NewSoftware
-        {
-            get => _newSoftware;
-            set { _newSoftware = value; OnPropertyChanged(nameof(NewSoftware)); }
-        }
-
-        public string SelectedSoftware { get; set; }
-
-        private void ChangeLanguage(object param)
+        private void ExecuteChangeLanguage(object param)
         {
             string lang = param as string ?? "EN";
             CurrentSettings.Language = lang;
