@@ -18,6 +18,9 @@ namespace EasySave.ViewModels
         public List<BackupType> AvailableTypes { get; } = new List<BackupType> { BackupType.Full, BackupType.Differential };
         public bool IsJobSelected => SelectedJob != null;
 
+        public bool IsAllPaused => Jobs.Any(j => j.IsRunning) && Jobs.Where(j => j.IsRunning).All(j => j.IsPaused || j.IsPausePending);
+        public bool IsSoftwareSuspended => Jobs.Any(j => j.IsRunning && j.IsSoftwareSuspended);
+
         private JobViewModel _selectedJob;
         public JobViewModel SelectedJob { get => _selectedJob; set { if (_selectedJob != value) { _selectedJob = value; OnPropertyChanged(nameof(SelectedJob)); OnPropertyChanged(nameof(IsJobSelected)); } } }
 
@@ -30,6 +33,8 @@ namespace EasySave.ViewModels
         public ICommand PauseJobCommand { get; }
         public ICommand ResumeJobCommand { get; }
         public ICommand StopJobCommand { get; }
+        public ICommand PauseAllCommand { get; }
+        public ICommand StopAllCommand { get; }
 
         public JobManagementViewModel(SettingService configManager, BackupService backupEngine, NetworkService networkService, LanguageService languageService, SynchronizationContext uiContext)
         {
@@ -49,6 +54,8 @@ namespace EasySave.ViewModels
             PauseJobCommand = new RelayViewModel(ExecutePauseJob);
             ResumeJobCommand = new RelayViewModel(ExecuteResumeJob);
             StopJobCommand = new RelayViewModel(ExecuteStopJob);
+            PauseAllCommand = new RelayViewModel(ExecutePauseAll);
+            StopAllCommand = new RelayViewModel(ExecuteStopAll);
 
             RegisterEngineEvents();
         }
@@ -57,9 +64,14 @@ namespace EasySave.ViewModels
         {
             string displayMsg = message;
 
-            if (message.Contains(": START")) displayMsg = message.Replace(": START", " : " + LanguageService["StateActive"]);
-            else if (message.Contains(": END")) displayMsg = message.Replace(": END", " : " + LanguageService["StateFinished"]);
-            else if (message.Contains(": PAUSE_PENDING")) displayMsg = message.Replace(": PAUSE_PENDING", " : " + LanguageService["MsgPausePendingInfo"]);
+            if (message.Contains("[START]")) displayMsg = message.Replace("[START]", LanguageService["StateActive"]);
+            else if (message.Contains("[END]")) displayMsg = message.Replace("[END]", LanguageService["StateFinished"]);
+            else if (message.Contains("[PAUSE_PENDING]")) displayMsg = message.Replace("[PAUSE_PENDING]", LanguageService["MsgPausePendingInfo"]);
+            else if (message.Contains("[SOFTWARE_PAUSE]")) displayMsg = message.Replace("[SOFTWARE_PAUSE]", LanguageService["MsgSoftwarePause"]);
+            else if (message.Contains("[RESUME]")) displayMsg = message.Replace("[RESUME]", LanguageService["MsgResume"]);
+            else if (message.Contains("[BLOCKED_SIZE]")) displayMsg = message.Replace("[BLOCKED_SIZE]", LanguageService["MsgBlockedSize"]);
+            else if (message.Contains("[ERROR]")) displayMsg = message.Replace("[ERROR]", LanguageService["MsgError"]);
+            else if (message.Contains("[WAITING_CRYPTO]")) displayMsg = message.Replace("[WAITING_CRYPTO]", LanguageService["MsgWaitingCrypto"]);
 
             if (_uiContext != null) _uiContext.Post(_ => CurrentFile = displayMsg, null);
             else CurrentFile = displayMsg;
@@ -69,18 +81,22 @@ namespace EasySave.ViewModels
         {
             string displayMsg = rawMessage;
 
-            if (rawMessage.Contains(": START")) displayMsg = rawMessage.Replace(": START", " : " + LanguageService["StateActive"]);
-            else if (rawMessage.Contains(": END")) displayMsg = rawMessage.Replace(": END", " : " + LanguageService["StateFinished"]);
-            else if (rawMessage.Contains(": PAUSE_PENDING")) displayMsg = rawMessage.Replace(": PAUSE_PENDING", " : " + LanguageService["MsgPausePendingInfo"]);
+            if (rawMessage.Contains("[START]")) displayMsg = rawMessage.Replace("[START]", LanguageService["StateActive"]);
+            else if (rawMessage.Contains("[END]")) displayMsg = rawMessage.Replace("[END]", LanguageService["StateFinished"]);
+            else if (rawMessage.Contains("[PAUSE_PENDING]")) displayMsg = rawMessage.Replace("[PAUSE_PENDING]", LanguageService["MsgPausePendingInfo"]);
+            else if (rawMessage.Contains("[SOFTWARE_PAUSE]")) displayMsg = rawMessage.Replace("[SOFTWARE_PAUSE]", LanguageService["MsgSoftwarePause"]);
+            else if (rawMessage.Contains("[RESUME]")) displayMsg = rawMessage.Replace("[RESUME]", LanguageService["MsgResume"]);
+            else if (rawMessage.Contains("[BLOCKED_SIZE]")) displayMsg = rawMessage.Replace("[BLOCKED_SIZE]", LanguageService["MsgBlockedSize"]);
+            else if (rawMessage.Contains("[ERROR]")) displayMsg = rawMessage.Replace("[ERROR]", LanguageService["MsgError"]);
+            else if (rawMessage.Contains("[WAITING_CRYPTO]")) displayMsg = rawMessage.Replace("[WAITING_CRYPTO]", LanguageService["MsgWaitingCrypto"]);
 
             if (_uiContext != null) _uiContext.Post(_ => CurrentFile = displayMsg, null);
             else CurrentFile = displayMsg;
 
-            if (rawMessage.Contains(": START")) _networkService.SendMessage($"[START] {rawMessage.Split(':')[0].Trim()}");
-            else if (rawMessage.Contains(": END")) _networkService.SendMessage($"[END] {rawMessage.Split(':')[0].Trim()}");
-            else if (rawMessage.Contains(": PAUSE_PENDING")) _networkService.SendMessage($"[PROGRESS] {rawMessage}");
-            else if (rawMessage.Contains(": ERREUR") || rawMessage.Contains(": ERROR")) _networkService.SendMessage($"[ERROR] {rawMessage}");
-            else _networkService.SendMessage($"[PROGRESS] {rawMessage}");
+            if (rawMessage.Contains("[START]")) _networkService.SendMessage($"[START] {rawMessage.Split(':')[0].Trim()}");
+            else if (rawMessage.Contains("[END]")) _networkService.SendMessage($"[END] {rawMessage.Split(':')[0].Trim()}");
+            else if (rawMessage.Contains("[ERROR]")) _networkService.SendMessage($"[ERROR] {displayMsg}");
+            else _networkService.SendMessage($"[PROGRESS] {displayMsg}");
         }
 
         private void RegisterEngineEvents()
@@ -150,7 +166,19 @@ namespace EasySave.ViewModels
             };
         }
 
-        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e) { if (e.PropertyName == "Progress" || e.PropertyName == "CurrentSpeed" || e.PropertyName == "IsSelected" || e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsPausePending" || e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked" || e.PropertyName == "IsSoftwareSuspended" || e.PropertyName == "IsFinished" || e.PropertyName == "IsCanceled") return; SaveConfig(); }
+        private void OnJobPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsPausePending")
+            {
+                OnPropertyChanged(nameof(IsAllPaused));
+            }
+            if (e.PropertyName == "IsRunning" || e.PropertyName == "IsSoftwareSuspended")
+            {
+                OnPropertyChanged(nameof(IsSoftwareSuspended));
+            }
+            if (e.PropertyName == "Progress" || e.PropertyName == "CurrentSpeed" || e.PropertyName == "IsSelected" || e.PropertyName == "IsRunning" || e.PropertyName == "IsPaused" || e.PropertyName == "IsPausePending" || e.PropertyName == "IsWaiting" || e.PropertyName == "IsBlocked" || e.PropertyName == "IsSoftwareSuspended" || e.PropertyName == "IsFinished" || e.PropertyName == "IsCanceled") return;
+            SaveConfig();
+        }
 
         public void SaveConfig() { var settings = _configManager.LoadSettings(); settings.Jobs = Jobs.Select(j => j.Model).ToList(); _configManager.SaveSettings(settings); }
 
@@ -283,7 +311,6 @@ namespace EasySave.ViewModels
                 if (settings.PauseBehavior == "AfterFile")
                 {
                     job.IsPausePending = true;
-                    // Le BackupService déclenchera "PAUSE_PENDING" pour mettre à jour la barre d'historique
                 }
                 else
                 {
@@ -313,6 +340,61 @@ namespace EasySave.ViewModels
                 _backupEngine.StopJob(job.Name);
                 UpdateActivityBar($"{job.Name} : {LanguageService["MsgForceStop"]}");
             }
+        }
+
+        private void ExecutePauseAll(object parameter)
+        {
+            var runningJobs = Jobs.Where(j => j.IsRunning).ToList();
+            if (!runningJobs.Any()) return;
+
+            if (IsAllPaused)
+            {
+                if (_backupEngine.GetRunningBusinessSoftware() != null) { CurrentFile = LanguageService["MsgBlockingSoftware"]; return; }
+                foreach (var job in runningJobs)
+                {
+                    _backupEngine.ResumeJob(job.Name);
+                    job.IsPaused = false;
+                    job.IsPausePending = false;
+                }
+                UpdateActivityBar($"ALL : {LanguageService["MsgResume"]}");
+            }
+            else
+            {
+                var settings = _configManager.LoadSettings();
+                bool pauseAfterFile = settings.PauseBehavior == "AfterFile";
+
+                foreach (var job in runningJobs.Where(j => !j.IsPaused && !j.IsPausePending))
+                {
+                    _backupEngine.PauseJob(job.Name);
+
+                    if (pauseAfterFile)
+                    {
+                        job.IsPausePending = true;
+                    }
+                    else
+                    {
+                        job.IsPaused = true;
+                        job.CurrentSpeed = "";
+                    }
+                }
+
+                if (!pauseAfterFile)
+                {
+                    UpdateActivityBar($"ALL : {LanguageService["MsgManualPause"]}");
+                }
+            }
+        }
+
+        private void ExecuteStopAll(object parameter)
+        {
+            var jobsToStop = Jobs.Where(j => j.IsRunning).ToList();
+            if (!jobsToStop.Any()) return;
+
+            foreach (var job in jobsToStop)
+            {
+                _backupEngine.StopJob(job.Name);
+            }
+            UpdateActivityBar($"ALL : {LanguageService["MsgForceStop"]}");
         }
 
         private void ExecuteAddJob(object parameter) { int newId = Jobs.Count > 0 ? Jobs.Max(j => j.Id) + 1 : 1; var newViewModel = new JobViewModel(new BackupJob { Id = newId, Name = $"Save {newId}", SourceDirectory = "", TargetDirectory = "", Type = BackupType.Full }); newViewModel.PropertyChanged += OnJobPropertyChanged; Jobs.Add(newViewModel); SaveConfig(); SelectedJob = newViewModel; CurrentFile = LanguageService["MsgSlotAdded"]; }

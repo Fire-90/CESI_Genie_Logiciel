@@ -66,7 +66,6 @@ namespace EasySave.Services
                     }
                     else
                     {
-                        // Transmission du statut "PAUSE_PENDING" pour le réseau et mise à jour locale
                         lock (_stateLock)
                         {
                             _stateTracker.UpdateState(jobName, s =>
@@ -74,7 +73,7 @@ namespace EasySave.Services
                                 s.State = "PAUSE_PENDING";
                             });
                         }
-                        OnActivityMessage?.Invoke($"{jobName} : PAUSE_PENDING");
+                        OnActivityMessage?.Invoke($"{jobName} : [PAUSE_PENDING]");
                     }
                 }
             }
@@ -139,7 +138,7 @@ namespace EasySave.Services
                             OnJobProgress?.Invoke(jobName, s.Progression, s.CurrentSpeed);
                         });
                     }
-                    OnActivityMessage?.Invoke($"{jobName} : PAUSE (Logiciel métier : {blocking})");
+                    OnActivityMessage?.Invoke($"{jobName} : [SOFTWARE_PAUSE] {blocking}");
                 }
                 await Task.Delay(1000, token);
             }
@@ -148,7 +147,7 @@ namespace EasySave.Services
             {
                 OnJobSuspendedBySoftware?.Invoke(jobName, false, null);
                 lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "ACTIVE"); }
-                OnActivityMessage?.Invoke($"{jobName} : REPRISE");
+                OnActivityMessage?.Invoke($"{jobName} : [RESUME]");
             }
         }
 
@@ -181,7 +180,7 @@ namespace EasySave.Services
 
             try
             {
-                OnActivityMessage?.Invoke($"{job.Name} : START");
+                OnActivityMessage?.Invoke($"{job.Name} : [START]");
 
                 foreach (string file in priorityFiles)
                 {
@@ -248,7 +247,7 @@ namespace EasySave.Services
             catch (OperationCanceledException) { throw new Exception("Job stopped manually."); }
             finally
             {
-                OnActivityMessage?.Invoke($"{job.Name} : END");
+                OnActivityMessage?.Invoke($"{job.Name} : [END]");
 
                 if (remainingPriorityFiles > 0)
                 {
@@ -337,7 +336,7 @@ namespace EasySave.Services
                                 OnJobProgress?.Invoke(job.Name, s.Progression, s.CurrentSpeed);
                             });
                         }
-                        OnActivityMessage?.Invoke($"{job.Name} : BLOQUÉ (Limite de taille dépassée par {Path.GetFileName(source)})");
+                        OnActivityMessage?.Invoke($"{job.Name} : [BLOCKED_SIZE] {Path.GetFileName(source)}");
 
                         while (true)
                         {
@@ -387,7 +386,7 @@ namespace EasySave.Services
             catch (Exception ex)
             {
                 totalSw.Stop();
-                OnActivityMessage?.Invoke($"{job.Name} : ERREUR {ex.Message}");
+                OnActivityMessage?.Invoke($"{job.Name} : [ERROR] {ex.Message}");
                 await DailyLogger.Instance.WriteLogAsync(new LogEntry
                 {
                     Name = job.Name,
@@ -549,7 +548,7 @@ namespace EasySave.Services
                 {
                     OnJobWaiting?.Invoke(jobName, true);
                     lock (_stateLock) { _stateTracker.UpdateState(jobName, s => s.State = "WAITING"); }
-                    OnActivityMessage?.Invoke($"{jobName} : EN ATTENTE (Chiffrement simultané limité)");
+                    OnActivityMessage?.Invoke($"{jobName} : [WAITING_CRYPTO]");
 
                     while (true)
                     {

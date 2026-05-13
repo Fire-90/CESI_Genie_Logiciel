@@ -3,7 +3,19 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             mc:Ignorable="d">
+             xmlns:local="clr-namespace:Graphic.Views"
+             mc:Ignorable="d" x:Name="RootControl">
+
+    <UserControl.Resources>
+        <local:WidthToVisibilityConverter x:Key="WidthToVisConverter"/>
+
+        <Style x:Key="ResponsiveButtonText" TargetType="TextBlock">
+            <Setter Property="Margin" Value="8,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Visibility" Value="{Binding ActualWidth, ElementName=RootControl, Converter={StaticResource WidthToVisConverter}, ConverterParameter=900}"/>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Margin="20" DataContext="{Binding JobVM}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -126,13 +138,32 @@
                     </DataGridTextColumn.HeaderTemplate>
                 </DataGridTextColumn>
 
-                <DataGridTextColumn Binding="{Binding Type, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="100">
-                    <DataGridTextColumn.HeaderTemplate>
+                <DataGridTemplateColumn Width="120">
+                    <DataGridTemplateColumn.HeaderTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DataContext.LanguageService[LblType], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                         </DataTemplate>
-                    </DataGridTextColumn.HeaderTemplate>
-                </DataGridTextColumn>
+                    </DataGridTemplateColumn.HeaderTemplate>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="{Binding Type}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Type}" Value="Full">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[TypeFull], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Type}" Value="Differential">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[TypeDifferential], RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
 
                 <DataGridTemplateColumn Header="Progression" Width="120">
                     <DataGridTemplateColumn.CellTemplate>
@@ -224,10 +255,11 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="150"/>
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,15,10">
@@ -235,31 +267,134 @@
                 <TextBox Text="{Binding SelectedJob.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
             </StackPanel>
 
-            <StackPanel Grid.Row="0" Grid.Column="1" Margin="15,0,0,10">
+            <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
                 <TextBlock Text="{Binding LanguageService[LblType]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
-                <ComboBox ItemsSource="{Binding AvailableTypes}" SelectedItem="{Binding SelectedJob.Type, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding AvailableTypes}" SelectedItem="{Binding SelectedJob.Type, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="{Binding}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding}" Value="Full">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[TypeFull], RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding}" Value="Differential">
+                                                <Setter Property="Text" Value="{Binding DataContext.LanguageService[TypeDifferential], RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
             </StackPanel>
 
-            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,15,20">
+            <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,10">
                 <TextBlock Text="{Binding LanguageService[LblSource]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
                 <TextBox Text="{Binding SelectedJob.SourceDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
             </StackPanel>
 
-            <StackPanel Grid.Row="1" Grid.Column="1" Margin="15,0,0,20">
+            <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,20">
                 <TextBlock Text="{Binding LanguageService[LblTarget]}" Margin="0,0,0,5" FontWeight="SemiBold" Foreground="#34495E"/>
                 <TextBox Text="{Binding SelectedJob.TargetDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
             </StackPanel>
 
-            <StackPanel Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">
-                <TextBlock Text="{Binding LanguageService[Recent]}" FontWeight="Bold" Foreground="Gray"/>
-                <TextBlock Text="{Binding CurrentFile}" FontStyle="Italic" TextTrimming="CharacterEllipsis" Foreground="#34495E"/>
-            </StackPanel>
+            <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="{Binding LanguageService[BtnAdd]}" Command="{Binding AddJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                <Button Content="{Binding LanguageService[BtnDelete]}" Command="{Binding DeleteJobCommand}" Padding="20,10" Margin="0,0,15,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-                <Button Content="{Binding LanguageService[BtnRun]}" Command="{Binding ExecuteSelectionCommand}" Padding="20,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"/>
-            </StackPanel>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <TextBlock Text="{Binding LanguageService[Recent]}" FontWeight="Bold" Foreground="Gray"/>
+                    <TextBlock Text="{Binding CurrentFile}" FontStyle="Italic" TextTrimming="CharacterEllipsis" Foreground="#34495E"/>
+                </StackPanel>
+
+                <WrapPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Command="{Binding PauseAllCommand}" Padding="15,10" Margin="0,0,10,0" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#F39C12"/>
+                                <Setter Property="ToolTip" Value="{Binding LanguageService[BtnPauseAll]}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAllPaused}" Value="True">
+                                        <Setter Property="Background" Value="#2ECC71"/>
+                                        <Setter Property="ToolTip" Value="{Binding LanguageService[BtnResumeAll]}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
+                                        <Setter Property="Background" Value="#95A5A6"/>
+                                        <Setter Property="ToolTip" Value="{Binding LanguageService[BtnResumeAll]}"/>
+                                        <Setter Property="IsEnabled" Value="False"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <Path Fill="White" Stretch="Uniform" Width="12" Height="12">
+                                <Path.Style>
+                                    <Style TargetType="Path">
+                                        <Setter Property="Data" Value="M 2,0 L 4,0 L 4,10 L 2,10 Z M 6,0 L 8,0 L 8,10 L 6,10 Z"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsAllPaused}" Value="True">
+                                                <Setter Property="Data" Value="M 0,0 L 10,5 L 0,10 Z"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
+                                                <Setter Property="Data" Value="M 0,0 L 10,5 L 0,10 Z"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Path.Style>
+                            </Path>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource ResponsiveButtonText}">
+                                        <Setter Property="Text" Value="{Binding LanguageService[BtnPauseAll]}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsAllPaused}" Value="True">
+                                                <Setter Property="Text" Value="{Binding LanguageService[BtnResumeAll]}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsSoftwareSuspended}" Value="True">
+                                                <Setter Property="Text" Value="{Binding LanguageService[BtnResumeAll]}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding StopAllCommand}" ToolTip="{Binding LanguageService[BtnStopAll]}" Padding="15,10" Margin="0,0,10,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="M 0,0 L 10,0 L 10,10 L 0,10 Z" Fill="White" Stretch="Uniform" Width="12" Height="12"/>
+                            <TextBlock Text="{Binding LanguageService[BtnStopAll]}" Style="{StaticResource ResponsiveButtonText}"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding AddJobCommand}" ToolTip="{Binding LanguageService[BtnAdd]}" Padding="15,10" Margin="0,0,10,0" Background="#3498DB" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="M 4,0 L 6,0 L 6,4 L 10,4 L 10,6 L 6,6 L 6,10 L 4,10 L 4,6 L 0,6 L 0,4 L 4,4 Z" Fill="White" Stretch="Uniform" Width="12" Height="12"/>
+                            <TextBlock Text="{Binding LanguageService[BtnAdd]}" Style="{StaticResource ResponsiveButtonText}"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding DeleteJobCommand}" ToolTip="{Binding LanguageService[BtnDelete]}" Padding="15,10" Margin="0,0,10,0" Background="#E74C3C" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="M 3,0 L 7,0 L 7,2 L 10,2 L 10,4 L 8,4 L 8,10 L 2,10 L 2,4 L 0,4 L 0,2 L 3,2 Z" Fill="White" Stretch="Uniform" Width="12" Height="12"/>
+                            <TextBlock Text="{Binding LanguageService[BtnDelete]}" Style="{StaticResource ResponsiveButtonText}"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding ExecuteSelectionCommand}" ToolTip="{Binding LanguageService[BtnRun]}" Padding="15,10" Background="#2ECC71" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="M 0,0 L 10,5 L 0,10 Z" Fill="White" Stretch="Uniform" Width="12" Height="12"/>
+                            <TextBlock Text="{Binding LanguageService[BtnRun]}" Style="{StaticResource ResponsiveButtonText}"/>
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

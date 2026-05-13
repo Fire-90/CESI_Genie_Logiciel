@@ -27,9 +27,9 @@
 
                             <StackPanel Margin="0,0,0,15">
                                 <TextBlock Text="{Binding LanguageService[LblLanguage]}" FontWeight="SemiBold" Foreground="#34495E" Margin="0,0,0,5"/>
-                                <ComboBox SelectedValue="{Binding Language, Mode=TwoWay}" SelectedValuePath="Content" Height="30" Padding="5" VerticalContentAlignment="Center">
-                                    <ComboBoxItem Content="FR"/>
-                                    <ComboBoxItem Content="EN"/>
+                                <ComboBox SelectedValue="{Binding Language, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
+                                    <ComboBoxItem Content="{Binding LanguageService[LangFR]}" Tag="FR"/>
+                                    <ComboBoxItem Content="{Binding LanguageService[LangEN]}" Tag="EN"/>
                                 </ComboBox>
                             </StackPanel>
 
@@ -98,7 +98,11 @@
                                         <ColumnDefinition Width="60"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0" Text="{Binding MaxParallelFileSizeLimit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="30" Padding="5" Margin="0,0,10,0" VerticalContentAlignment="Center"/>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableSizeUnits}" SelectedItem="{Binding MaxParallelFileSizeLimitUnit, Mode=TwoWay}" Height="30" Padding="5" VerticalContentAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" SelectedValue="{Binding MaxParallelFileSizeLimitUnit, Mode=TwoWay}" SelectedValuePath="Tag" Height="30" Padding="5" VerticalContentAlignment="Center">
+                                        <ComboBoxItem Content="{Binding LanguageService[UnitKB]}" Tag="Ko"/>
+                                        <ComboBoxItem Content="{Binding LanguageService[UnitMB]}" Tag="Mo"/>
+                                        <ComboBoxItem Content="{Binding LanguageService[UnitGB]}" Tag="Go"/>
+                                    </ComboBox>
                                 </Grid>
                             </StackPanel>
 
