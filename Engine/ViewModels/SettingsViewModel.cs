@@ -22,7 +22,6 @@ namespace EasySave.ViewModels
         public List<string> AvailableLogDestinations { get; } = new List<string> { "LocalOnly", "ServerOnly", "LocalAndServer" };
         public List<string> AvailableSizeUnits { get; } = new List<string> { "Ko", "Mo", "Go" };
 
-        // --- STATUT DE CONNEXION ---
         private ConnectionStatus _currentConnectionStatus = ConnectionStatus.Disconnected;
 
         private string _connectionStatusText;
@@ -30,8 +29,6 @@ namespace EasySave.ViewModels
 
         private string _connectionStatusColor = "#E74C3C";
         public string ConnectionStatusColor { get => _connectionStatusColor; set { _connectionStatusColor = value; OnPropertyChanged(nameof(ConnectionStatusColor)); } }
-
-        // --- ENCAPSULATION DES PARAMÈTRES POUR FORCER LA SAUVEGARDE EN TEMPS RÉEL ---
 
         public string Language
         {
