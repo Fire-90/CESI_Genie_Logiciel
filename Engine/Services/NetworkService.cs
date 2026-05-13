@@ -31,6 +31,8 @@ namespace EasySave.Services
                     {
                         if (_client == null || !_client.Connected)
                         {
+                            CleanupConnection();
+
                             OnConnectionStatusChanged?.Invoke(ConnectionStatus.Connecting);
                             var settings = _configManager.LoadSettings();
                             string ipAddress = string.IsNullOrWhiteSpace(settings.ServerIP) ? "127.0.0.1" : settings.ServerIP;
@@ -52,9 +54,10 @@ namespace EasySave.Services
                     }
                     catch
                     {
+                        CleanupConnection();
                         OnConnectionStatusChanged?.Invoke(ConnectionStatus.Disconnected);
                     }
-                    await Task.Delay(5000);
+                    await Task.Delay(10000);
                 }
             });
         }
@@ -87,6 +90,7 @@ namespace EasySave.Services
             catch { }
             finally
             {
+                CleanupConnection();
                 OnConnectionStatusChanged?.Invoke(ConnectionStatus.Disconnected);
             }
         }
@@ -104,8 +108,22 @@ namespace EasySave.Services
                         stream.Write(data, 0, data.Length);
                         stream.Flush();
                     }
-                    catch { }
+                    catch
+                    {
+                        CleanupConnection();
+                        OnConnectionStatusChanged?.Invoke(ConnectionStatus.Disconnected);
+                    }
                 }
+            }
+        }
+
+        private void CleanupConnection()
+        {
+            if (_client != null)
+            {
+                try { _client.Close(); } catch { }
+                try { _client.Dispose(); } catch { }
+                _client = null;
             }
         }
     }

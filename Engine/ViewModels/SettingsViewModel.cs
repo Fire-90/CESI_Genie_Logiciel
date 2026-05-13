@@ -10,6 +10,8 @@ namespace EasySave.ViewModels
     {
         private readonly SettingService _configManager;
         private readonly JobManagementViewModel _jobVM;
+        private readonly NetworkService _networkService;
+        private readonly SynchronizationContext _syncContext;
 
         public LanguageService LanguageService { get; }
 
@@ -19,6 +21,15 @@ namespace EasySave.ViewModels
         public List<string> AvailableLogFormats { get; } = new List<string> { "JSON", "XML" };
         public List<string> AvailableLogDestinations { get; } = new List<string> { "LocalOnly", "ServerOnly", "LocalAndServer" };
         public List<string> AvailableSizeUnits { get; } = new List<string> { "Ko", "Mo", "Go" };
+
+        // --- STATUT DE CONNEXION ---
+        private ConnectionStatus _currentConnectionStatus = ConnectionStatus.Disconnected;
+
+        private string _connectionStatusText;
+        public string ConnectionStatusText { get => _connectionStatusText; set { _connectionStatusText = value; OnPropertyChanged(nameof(ConnectionStatusText)); } }
+
+        private string _connectionStatusColor = "#E74C3C";
+        public string ConnectionStatusColor { get => _connectionStatusColor; set { _connectionStatusColor = value; OnPropertyChanged(nameof(ConnectionStatusColor)); } }
 
         // --- ENCAPSULATION DES PARAMÈTRES POUR FORCER LA SAUVEGARDE EN TEMPS RÉEL ---
 
@@ -116,11 +127,13 @@ namespace EasySave.ViewModels
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
 
-        public SettingsViewModel(SettingService configManager, LanguageService languageService, JobManagementViewModel jobVM)
+        public SettingsViewModel(SettingService configManager, LanguageService languageService, JobManagementViewModel jobVM, NetworkService networkService, SynchronizationContext syncContext)
         {
             _configManager = configManager;
             LanguageService = languageService;
             _jobVM = jobVM;
+            _networkService = networkService;
+            _syncContext = syncContext;
 
             CurrentSettings = _configManager.LoadSettings();
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
@@ -130,6 +143,32 @@ namespace EasySave.ViewModels
             RemoveSoftwareCommand = new RelayViewModel(ExecuteRemoveSoftware);
 
             LanguageService.CurrentLanguage = CurrentSettings.Language;
+
+            if (_networkService != null)
+            {
+                _networkService.OnConnectionStatusChanged += HandleConnectionStatusChanged;
+            }
+
+            LanguageService.PropertyChanged += (s, e) => { if (e.PropertyName == "Item[]") UpdateConnectionStatusUI(); };
+            ConnectionStatusText = LanguageService["StatusDisconnected"];
+        }
+
+        private void HandleConnectionStatusChanged(ConnectionStatus status)
+        {
+            _currentConnectionStatus = status;
+            UpdateConnectionStatusUI();
+        }
+
+        private void UpdateConnectionStatusUI()
+        {
+            Action action = () =>
+            {
+                if (_currentConnectionStatus == ConnectionStatus.Connected) { ConnectionStatusText = LanguageService["StatusConnected"]; ConnectionStatusColor = "#2ECC71"; }
+                else if (_currentConnectionStatus == ConnectionStatus.Connecting) { ConnectionStatusText = LanguageService["StatusConnecting"]; ConnectionStatusColor = "#F39C12"; }
+                else { ConnectionStatusText = LanguageService["StatusDisconnected"]; ConnectionStatusColor = "#E74C3C"; }
+            };
+            if (_syncContext != null) _syncContext.Post(_ => action(), null);
+            else action();
         }
 
         private void ExecuteChangeLanguage(object param)

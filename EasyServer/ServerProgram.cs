@@ -86,7 +86,7 @@ namespace EasyServer
                             Console.WriteLine($"[MESSAGE] Reçu de {clientId} : {msg}");
 
                             string broadcastMsg = msg;
-                            if (msg.StartsWith("[START]") || msg.StartsWith("[END]") || msg.StartsWith("[PROGRESS]") || msg.StartsWith("[ERROR]"))
+                            if (msg.StartsWith("[START]") || msg.StartsWith("[END]") || msg.StartsWith("[PROGRESS]") || msg.StartsWith("[ERROR]") || msg.StartsWith("[CANCELED]"))
                             {
                                 int firstBracketEnd = msg.IndexOf(']');
                                 string tag = msg.Substring(0, firstBracketEnd + 1);

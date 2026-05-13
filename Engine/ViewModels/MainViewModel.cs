@@ -34,7 +34,7 @@ namespace EasySave.ViewModels
             LanguageService = new LanguageService();
 
             JobVM = new JobManagementViewModel(_configManager, _backupEngine, _networkService, LanguageService, _syncContext);
-            SettingsVM = new SettingsViewModel(_configManager, LanguageService, JobVM);
+            SettingsVM = new SettingsViewModel(_configManager, LanguageService, JobVM, _networkService, _syncContext);
             NetworkVM = new NetworkViewModel(_networkService, _stateTracker, _configManager, LanguageService, _syncContext);
 
             NetworkVM.OnNewRemoteActivity += (msg) => { JobVM.ExternalActivityUpdate(msg); };

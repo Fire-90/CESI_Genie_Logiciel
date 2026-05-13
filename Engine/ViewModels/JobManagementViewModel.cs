@@ -66,6 +66,7 @@ namespace EasySave.ViewModels
 
             if (message.Contains("[START]")) displayMsg = message.Replace("[START]", LanguageService["StateActive"]);
             else if (message.Contains("[END]")) displayMsg = message.Replace("[END]", LanguageService["StateFinished"]);
+            else if (message.Contains("[CANCELED]")) displayMsg = message.Replace("[CANCELED]", LanguageService["StateCanceled"]);
             else if (message.Contains("[PAUSE_PENDING]")) displayMsg = message.Replace("[PAUSE_PENDING]", LanguageService["MsgPausePendingInfo"]);
             else if (message.Contains("[SOFTWARE_PAUSE]")) displayMsg = message.Replace("[SOFTWARE_PAUSE]", LanguageService["MsgSoftwarePause"]);
             else if (message.Contains("[RESUME]")) displayMsg = message.Replace("[RESUME]", LanguageService["MsgResume"]);
@@ -83,6 +84,7 @@ namespace EasySave.ViewModels
 
             if (rawMessage.Contains("[START]")) displayMsg = rawMessage.Replace("[START]", LanguageService["StateActive"]);
             else if (rawMessage.Contains("[END]")) displayMsg = rawMessage.Replace("[END]", LanguageService["StateFinished"]);
+            else if (rawMessage.Contains("[CANCELED]")) displayMsg = rawMessage.Replace("[CANCELED]", LanguageService["StateCanceled"]);
             else if (rawMessage.Contains("[PAUSE_PENDING]")) displayMsg = rawMessage.Replace("[PAUSE_PENDING]", LanguageService["MsgPausePendingInfo"]);
             else if (rawMessage.Contains("[SOFTWARE_PAUSE]")) displayMsg = rawMessage.Replace("[SOFTWARE_PAUSE]", LanguageService["MsgSoftwarePause"]);
             else if (rawMessage.Contains("[RESUME]")) displayMsg = rawMessage.Replace("[RESUME]", LanguageService["MsgResume"]);
@@ -95,6 +97,7 @@ namespace EasySave.ViewModels
 
             if (rawMessage.Contains("[START]")) _networkService.SendMessage($"[START] {rawMessage.Split(':')[0].Trim()}");
             else if (rawMessage.Contains("[END]")) _networkService.SendMessage($"[END] {rawMessage.Split(':')[0].Trim()}");
+            else if (rawMessage.Contains("[CANCELED]")) _networkService.SendMessage($"[CANCELED] {rawMessage.Split(':')[0].Trim()}");
             else if (rawMessage.Contains("[ERROR]")) _networkService.SendMessage($"[ERROR] {displayMsg}");
             else _networkService.SendMessage($"[PROGRESS] {displayMsg}");
         }

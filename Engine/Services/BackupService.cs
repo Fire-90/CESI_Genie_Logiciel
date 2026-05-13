@@ -178,6 +178,8 @@ namespace EasySave.Services
 
             lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "ACTIVE"; s.TotalFilesToCopy = totalFilesToCopy; s.NbFilesLeftToDo = totalFilesToCopy; s.Progression = 0; s.CurrentSpeed = ""; }); }
 
+            bool isCanceled = false;
+
             try
             {
                 OnActivityMessage?.Invoke($"{job.Name} : [START]");
@@ -244,10 +246,11 @@ namespace EasySave.Services
                     await ProcessSingleFileAsync(file, job, cts.Token);
                 }
             }
-            catch (OperationCanceledException) { throw new Exception("Job stopped manually."); }
+            catch (OperationCanceledException) { isCanceled = true; throw new Exception("Job stopped manually."); }
             finally
             {
-                OnActivityMessage?.Invoke($"{job.Name} : [END]");
+                if (isCanceled) OnActivityMessage?.Invoke($"{job.Name} : [CANCELED]");
+                else OnActivityMessage?.Invoke($"{job.Name} : [END]");
 
                 if (remainingPriorityFiles > 0)
                 {
@@ -261,8 +264,15 @@ namespace EasySave.Services
                 _jobSpeedStopwatches.TryRemove(job.Name, out _);
                 _jobBytesSinceLastUpdate.TryRemove(job.Name, out _);
 
-                lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "FINISHED"; s.Progression = 100; s.CurrentSpeed = ""; }); }
-                OnJobProgress?.Invoke(job.Name, 100, "");
+                if (isCanceled)
+                {
+                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "CANCELED"; s.CurrentSpeed = ""; }); }
+                }
+                else
+                {
+                    lock (_stateLock) { _stateTracker.UpdateState(job.Name, s => { s.State = "FINISHED"; s.Progression = 100; s.CurrentSpeed = ""; }); }
+                    OnJobProgress?.Invoke(job.Name, 100, "");
+                }
 
                 Task.Run(async () =>
                 {

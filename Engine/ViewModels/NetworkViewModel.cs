@@ -60,7 +60,7 @@ namespace EasySave.ViewModels
 
         private void HandleNetworkMessage(string message)
         {
-            if (message.StartsWith("[END]|") || message.StartsWith("[PROGRESS]|") || message.StartsWith("[START]|"))
+            if (message.StartsWith("[END]|") || message.StartsWith("[PROGRESS]|") || message.StartsWith("[START]|") || message.StartsWith("[CANCELED]|"))
             {
                 var parts = message.Split('|');
                 if (parts.Length >= 3)
@@ -71,6 +71,7 @@ namespace EasySave.ViewModels
                     string uiMsg = "";
                     if (message.StartsWith("[START]")) uiMsg = $"[{rClientId}] {rJobName} : START";
                     if (message.StartsWith("[END]")) uiMsg = $"[{rClientId}] {rJobName} : END";
+                    if (message.StartsWith("[CANCELED]")) uiMsg = $"[{rClientId}] {rJobName} : CANCELED";
                     if (!string.IsNullOrEmpty(uiMsg)) OnNewRemoteActivity?.Invoke(uiMsg);
 
                     Action action = () =>
@@ -83,6 +84,7 @@ namespace EasySave.ViewModels
                             {
                                 if (message.StartsWith("[END]")) { job.State = LanguageService["StateFinished"]; job.Progression = 100; job.NbFilesLeftToDo = 0; job.CurrentSpeed = ""; }
                                 else if (message.StartsWith("[START]")) { job.State = LanguageService["StateActive"]; job.Progression = 0; job.CurrentSpeed = ""; }
+                                else if (message.StartsWith("[CANCELED]")) { job.State = LanguageService["StateCanceled"]; job.CurrentSpeed = ""; }
                             }
                         }
                         catch { }
@@ -112,7 +114,8 @@ namespace EasySave.ViewModels
                             {
                                 foreach (var pj in parsedJobs)
                                 {
-                                    switch (pj.State)
+                                    string rawState = pj.State?.Trim().ToUpperInvariant() ?? "";
+                                    switch (rawState)
                                     {
                                         case "ACTIVE": pj.State = LanguageService["StateActive"]; break;
                                         case "INACTIVE": pj.State = LanguageService["StateInactive"]; break;
@@ -122,9 +125,11 @@ namespace EasySave.ViewModels
                                         case "SUSPENDED": pj.State = LanguageService["StateSuspended"]; break;
                                         case "PAUSE_PENDING": pj.State = LanguageService["StatePausePending"]; break;
                                         case "WAITING": pj.State = LanguageService["StateWaiting"]; break;
+                                        case "CANCELED": pj.State = LanguageService["StateCanceled"]; break;
+                                        default:
+                                            break;
                                     }
 
-                                    // Traduction distante de la vitesse/chiffrement
                                     if (pj.CurrentSpeed == "ENCRYPTING")
                                     {
                                         pj.CurrentSpeed = LanguageService["StateEncrypting"];
