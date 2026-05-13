@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using System.Text.Json;
 
 namespace EasyServer
 {
@@ -92,14 +88,12 @@ namespace EasyServer
                     if (File.Exists(stateFilePath))
                     {
                         string json = File.ReadAllText(stateFilePath);
-                        // On désérialise en liste de dictionnaires pour pouvoir modifier les valeurs dynamiquement
                         var jobs = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json);
 
                         if (jobs != null)
                         {
                             foreach (var job in jobs)
                             {
-                                // Réinitialisation de toutes les données d'état
                                 if (job.ContainsKey("State")) job["State"] = "INACTIVE";
                                 if (job.ContainsKey("SourceFilePath")) job["SourceFilePath"] = "";
                                 if (job.ContainsKey("TargetFilePath")) job["TargetFilePath"] = "";
@@ -112,7 +106,6 @@ namespace EasyServer
 
                             }
 
-                            // Sauvegarde du fichier nettoyé
                             var options = new JsonSerializerOptions { WriteIndented = true };
                             File.WriteAllText(stateFilePath, JsonSerializer.Serialize(jobs, options));
                         }
