@@ -2,14 +2,10 @@
 using EasySave.Models;
 using EasySave.Services;
 using EasySave.Views;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace EasySave.ConsoleApp
 {
-    class ConsoleProgram
+    public class ConsoleProgram
     {
         private static ConsoleView _view;
         private static BackupService _engine;
@@ -18,7 +14,7 @@ namespace EasySave.ConsoleApp
         private static AppSettings _appSettings;
         private static List<BackupJob> _jobs;
 
-        static async Task Main(string[] args)
+        public static async Task Main(string[] args)
         {
             _view = new ConsoleView();
 
