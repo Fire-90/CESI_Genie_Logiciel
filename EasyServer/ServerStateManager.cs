@@ -8,6 +8,7 @@ namespace EasyServer
 {
     public sealed class ServerStateManager
     {
+        // Singleton
         private static readonly Lazy<ServerStateManager> _instance = new Lazy<ServerStateManager>(() => new ServerStateManager());
         public static ServerStateManager Instance => _instance.Value;
 

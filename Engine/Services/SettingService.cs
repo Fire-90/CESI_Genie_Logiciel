@@ -1,18 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using EasySave.Models;
 using System.Text.Json;
-using System.Threading;
-using EasySave.Models;
 
 namespace EasySave.Services
 {
-    public class ConfigManager
+    public class SettingService
     {
         private readonly string _settingsFilePath;
         private static readonly object _lockObj = new object();
 
-        public ConfigManager()
+        public SettingService()
         {
             string dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
             if (!Directory.Exists(dataPath)) Directory.CreateDirectory(dataPath);

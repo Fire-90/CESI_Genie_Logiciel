@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace EasyServer
@@ -41,6 +37,7 @@ namespace EasyServer
 
     public sealed class ServerLogger
     {
+        // Singleton
         private static readonly Lazy<ServerLogger> _instance = new Lazy<ServerLogger>(() => new ServerLogger());
         public static ServerLogger Instance => _instance.Value;
 

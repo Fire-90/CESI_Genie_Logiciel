@@ -1,23 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using EasySave.Models;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using EasySave.Models;
 
 namespace EasySave.Services
 {
 
-    public class StateTracker
+    public class StateService
     {
         private readonly string _stateFilePath;
         private static readonly object _lockObj = new object();
         private List<JobStateInfo> _currentStates;
 
+        // Observer
         public static event Action<string> OnStateUpdated;
 
-        public StateTracker(List<BackupJob> configuredJobs)
+        public StateService(List<BackupJob> configuredJobs)
         {
             string dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
             if (!Directory.Exists(dataPath)) Directory.CreateDirectory(dataPath);

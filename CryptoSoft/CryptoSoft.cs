@@ -1,15 +1,14 @@
-﻿using System;
-using System.IO;
-using System.Text;
-using System.Threading;
+﻿using System.Text;
 
 namespace CryptoSoft
 {
-    class Program
+    class CryptoSoft
     {
         static int Main(string[] args)
         {
             bool createdNew;
+
+            // Concurrence
             using (Mutex mutex = new Mutex(true, "Global\\CryptoSoft_Mutex", out createdNew))
             {
                 if (!createdNew)

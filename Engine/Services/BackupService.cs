@@ -1,19 +1,15 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using EasyLog;
 using EasySave.Models;
-using EasyLog;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace EasySave.Services
 {
-    public class BackupEngine
+    public class BackupService
     {
         public delegate void ProgressUpdateHandler(string currentFile, int remainingFiles);
+
+        // Observer
         public event ProgressUpdateHandler OnProgressUpdate;
         public event Action<string, int, string> OnJobProgress;
         public event Action<string, bool> OnJobWaiting;
@@ -21,14 +17,15 @@ namespace EasySave.Services
         public event Action<string, bool, string> OnJobSuspendedBySoftware;
         public event Action<string> OnActivityMessage;
 
-        private readonly StateTracker _stateTracker;
-        private readonly ConfigManager _configManager;
+        private readonly StateService _stateTracker;
+        private readonly SettingService _configManager;
         private readonly object _stateLock = new object();
 
         private static int GlobalPriorityFilesCount = 0;
         private static int PausedPriorityFilesCount = 0;
         private readonly ConcurrentDictionary<string, int> _priorityFilesRemainingPerJob = new();
 
+        // Concurrence
         private static readonly SemaphoreSlim _cryptoSoftLock = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim _largeFileLock = new SemaphoreSlim(1, 1);
 
@@ -38,7 +35,7 @@ namespace EasySave.Services
         private readonly ConcurrentDictionary<string, Stopwatch> _jobSpeedStopwatches = new();
         private readonly ConcurrentDictionary<string, long> _jobBytesSinceLastUpdate = new();
 
-        public BackupEngine(StateTracker stateTracker, ConfigManager configManager)
+        public BackupService(StateService stateTracker, SettingService configManager)
         {
             _stateTracker = stateTracker;
             _configManager = configManager;

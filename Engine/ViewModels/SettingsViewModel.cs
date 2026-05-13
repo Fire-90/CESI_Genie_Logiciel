@@ -1,17 +1,14 @@
-﻿using EasySave.Services;
-using EasySave.Models;
-using EasySave.ViewModels;
-using System;
+﻿using EasySave.Models;
+using EasySave.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.Windows.Input;
 
 namespace EasySave.ViewModels
 {
     public class SettingsViewModel : INotifyPropertyChanged
     {
-        private readonly ConfigManager _configManager;
+        private readonly SettingService _configManager;
         private readonly JobManagementViewModel _jobVM;
 
         public LanguageService LanguageService { get; }
@@ -27,7 +24,7 @@ namespace EasySave.ViewModels
         public ICommand AddSoftwareCommand { get; }
         public ICommand RemoveSoftwareCommand { get; }
 
-        public SettingsViewModel(ConfigManager configManager, LanguageService languageService, JobManagementViewModel jobVM)
+        public SettingsViewModel(SettingService configManager, LanguageService languageService, JobManagementViewModel jobVM)
         {
             _configManager = configManager;
             LanguageService = languageService;
@@ -36,9 +33,9 @@ namespace EasySave.ViewModels
             CurrentSettings = _configManager.LoadSettings();
             Softwares = new ObservableCollection<string>(CurrentSettings.BusinessSoftwares);
 
-            ChangeLanguageCommand = new RelayCommand(ChangeLanguage);
-            AddSoftwareCommand = new RelayCommand(ExecuteAddSoftware);
-            RemoveSoftwareCommand = new RelayCommand(ExecuteRemoveSoftware);
+            ChangeLanguageCommand = new RelayViewModel(ChangeLanguage);
+            AddSoftwareCommand = new RelayViewModel(ExecuteAddSoftware);
+            RemoveSoftwareCommand = new RelayViewModel(ExecuteRemoveSoftware);
 
             LanguageService.CurrentLanguage = CurrentSettings.Language;
         }

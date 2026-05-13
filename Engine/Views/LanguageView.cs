@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace EasySave.Core
+﻿namespace EasySave.Core
 {
-    public static class LanguageManager
+    public static class LanguageView
     {
         public static string CurrentLanguage { get; private set; } = "EN";
 

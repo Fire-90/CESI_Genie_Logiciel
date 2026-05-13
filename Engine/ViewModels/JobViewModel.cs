@@ -1,5 +1,5 @@
-﻿using System.ComponentModel;
-using EasySave.Models;
+﻿using EasySave.Models;
+using System.ComponentModel;
 
 namespace EasySave.ViewModels
 {

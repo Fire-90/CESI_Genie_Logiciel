@@ -1,22 +1,20 @@
-﻿using System;
+﻿using EasySave.Models;
 using System.Net.Sockets;
 using System.Text;
-using EasySave.Models;
-using System.Threading.Tasks;
 
 namespace EasySave.Services
 {
     public class NetworkService
     {
         private TcpClient _client;
-        private readonly ConfigManager _configManager;
+        private readonly SettingService _configManager;
         private readonly int _port;
         private readonly object _sendLock = new object();
 
         public event Action<string> OnMessageReceived;
         public event Action<ConnectionStatus> OnConnectionStatusChanged;
 
-        public NetworkService(ConfigManager configManager, int port = 11000)
+        public NetworkService(SettingService configManager, int port = 11000)
         {
             _configManager = configManager;
             _port = port;

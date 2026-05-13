@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using EasySave.Core;
 using EasySave.Models;
-using EasySave.Core;
 
 namespace EasySave.Views
 {
@@ -28,32 +26,32 @@ namespace EasySave.Views
         {
             Console.Clear();
             Console.WriteLine("==================================");
-            Console.WriteLine(LanguageManager.GetString("MenuTitle"));
+            Console.WriteLine(LanguageView.GetString("MenuTitle"));
             Console.WriteLine("==================================");
 
             foreach (var job in jobs)
             {
                 string status = string.IsNullOrWhiteSpace(job.SourceDirectory)
-                    ? LanguageManager.GetString("Empty")
-                    : LanguageManager.GetString("Ready");
+                    ? LanguageView.GetString("Empty")
+                    : LanguageView.GetString("Ready");
 
                 Console.WriteLine($" [{job.Id}] {job.Name} {status} ({job.Type})");
                 if (!string.IsNullOrWhiteSpace(job.SourceDirectory))
                 {
-                    Console.WriteLine($"{LanguageManager.GetString("Source")}{job.SourceDirectory}");
-                    Console.WriteLine($"{LanguageManager.GetString("Target")}{job.TargetDirectory}");
+                    Console.WriteLine($"{LanguageView.GetString("Source")}{job.SourceDirectory}");
+                    Console.WriteLine($"{LanguageView.GetString("Target")}{job.TargetDirectory}");
                 }
             }
 
-            Console.WriteLine(LanguageManager.GetString("OptionsTitle"));
-            Console.WriteLine(LanguageManager.GetString("OptionExecute"));
-            Console.WriteLine(LanguageManager.GetString("OptionQuit"));
-            Console.Write(LanguageManager.GetString("YourChoice"));
+            Console.WriteLine(LanguageView.GetString("OptionsTitle"));
+            Console.WriteLine(LanguageView.GetString("OptionExecute"));
+            Console.WriteLine(LanguageView.GetString("OptionQuit"));
+            Console.Write(LanguageView.GetString("YourChoice"));
         }
 
         public void DisplayMessage(string key, params object[] args)
         {
-            string message = LanguageManager.GetString(key);
+            string message = LanguageView.GetString(key);
             Console.WriteLine(args.Length > 0 ? string.Format(message, args) : message);
         }
 
@@ -61,23 +59,23 @@ namespace EasySave.Views
 
         public void WaitForAcknowledge()
         {
-            Console.WriteLine(LanguageManager.GetString("PressAnyKey"));
+            Console.WriteLine(LanguageView.GetString("PressAnyKey"));
             Console.ReadKey();
         }
 
         public void ConfigureJob(BackupJob job)
         {
-            Console.Write(LanguageManager.GetString("AskName"));
+            Console.Write(LanguageView.GetString("AskName"));
             string nameInput = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(nameInput)) job.Name = nameInput;
 
-            Console.Write(LanguageManager.GetString("AskSource"));
+            Console.Write(LanguageView.GetString("AskSource"));
             job.SourceDirectory = Console.ReadLine();
 
-            Console.Write(LanguageManager.GetString("AskTarget"));
+            Console.Write(LanguageView.GetString("AskTarget"));
             job.TargetDirectory = Console.ReadLine();
 
-            Console.Write(LanguageManager.GetString("AskType"));
+            Console.Write(LanguageView.GetString("AskType"));
             string typeInput = Console.ReadLine();
             job.Type = (typeInput == "2") ? BackupType.Differential : BackupType.Full;
         }

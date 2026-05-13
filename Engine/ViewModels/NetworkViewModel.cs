@@ -1,23 +1,18 @@
-﻿using EasySave.Services;
-using System;
-using System.Collections.Generic;
+﻿using EasySave.Models;
+using EasySave.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Input;
-using EasySave.Models;
 
 namespace EasySave.ViewModels
 {
     public class NetworkViewModel : INotifyPropertyChanged
     {
         private readonly NetworkService _networkService;
-        private readonly StateTracker _stateTracker;
-        private readonly ConfigManager _configManager;
+        private readonly StateService _stateTracker;
+        private readonly SettingService _configManager;
         private readonly SynchronizationContext _syncContext;
 
         public LanguageService LanguageService { get; }
@@ -36,7 +31,8 @@ namespace EasySave.ViewModels
 
         public ICommand RefreshProcessesCommand { get; }
 
-        public NetworkViewModel(NetworkService networkService, StateTracker stateTracker, ConfigManager configManager, LanguageService languageService, SynchronizationContext syncContext)
+        // Observer
+        public NetworkViewModel(NetworkService networkService, StateService stateTracker, SettingService configManager, LanguageService languageService, SynchronizationContext syncContext)
         {
             _networkService = networkService;
             _stateTracker = stateTracker;
@@ -44,7 +40,7 @@ namespace EasySave.ViewModels
             LanguageService = languageService;
             _syncContext = syncContext;
             RemoteStates = new ObservableCollection<RemoteClientState>();
-            RefreshProcessesCommand = new RelayCommand(ExecuteRefreshProcesses);
+            RefreshProcessesCommand = new RelayViewModel(ExecuteRefreshProcesses);
             _networkService.OnMessageReceived += HandleNetworkMessage;
             _networkService.OnConnectionStatusChanged += HandleConnectionStatusChanged;
             LanguageService.PropertyChanged += (s, e) => { if (e.PropertyName == "Item[]") UpdateConnectionStatusUI(); };

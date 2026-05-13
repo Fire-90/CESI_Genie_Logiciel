@@ -1,16 +1,15 @@
-﻿using System;
-using System.Windows.Input;
+﻿using System.Windows.Input;
 
 namespace EasySave.ViewModels
 {
-    public class RelayCommand : ICommand
+    public class RelayViewModel : ICommand
     {
         private readonly Action<object> _execute;
         private readonly Predicate<object> _canExecute;
 
         public event EventHandler CanExecuteChanged;
 
-        public RelayCommand(Action<object> execute, Predicate<object> canExecute = null)
+        public RelayViewModel(Action<object> execute, Predicate<object> canExecute = null)
         {
             _execute = execute ?? throw new ArgumentNullException(nameof(execute));
             _canExecute = canExecute;

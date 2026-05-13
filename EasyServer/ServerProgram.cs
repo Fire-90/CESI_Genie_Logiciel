@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace EasyServer
 {
-    class Program
+    class ServerProgram
     {
         private static TcpListener _listener;
         private static readonly Dictionary<TcpClient, string> _clients = new Dictionary<TcpClient, string>();

@@ -1,7 +1,4 @@
-﻿using EasySave.Models;
-using System.Text.Json.Serialization;
-
-namespace EasySave.Models
+﻿namespace EasySave.Models
 {
     public class BackupJob
     {

@@ -1,20 +1,15 @@
 ﻿using EasySave.Models;
 using EasySave.Services;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace EasySave.ViewModels
 {
     public class JobManagementViewModel : INotifyPropertyChanged
     {
-        private readonly ConfigManager _configManager;
-        private readonly BackupEngine _backupEngine;
+        private readonly SettingService _configManager;
+        private readonly BackupService _backupEngine;
         private readonly NetworkService _networkService;
         private readonly SynchronizationContext _uiContext;
 
@@ -36,7 +31,7 @@ namespace EasySave.ViewModels
         public ICommand ResumeJobCommand { get; }
         public ICommand StopJobCommand { get; }
 
-        public JobManagementViewModel(ConfigManager configManager, BackupEngine backupEngine, NetworkService networkService, LanguageService languageService, SynchronizationContext uiContext)
+        public JobManagementViewModel(SettingService configManager, BackupService backupEngine, NetworkService networkService, LanguageService languageService, SynchronizationContext uiContext)
         {
             _configManager = configManager;
             _backupEngine = backupEngine;
@@ -48,12 +43,12 @@ namespace EasySave.ViewModels
             Jobs = new ObservableCollection<JobViewModel>(settings.Jobs.Select(j => new JobViewModel(j)));
             foreach (var job in Jobs) job.PropertyChanged += OnJobPropertyChanged;
 
-            AddJobCommand = new RelayCommand(ExecuteAddJob);
-            ExecuteSelectionCommand = new RelayCommand(ExecuteSelectedJob);
-            DeleteJobCommand = new RelayCommand(ExecuteDeleteJob);
-            PauseJobCommand = new RelayCommand(ExecutePauseJob);
-            ResumeJobCommand = new RelayCommand(ExecuteResumeJob);
-            StopJobCommand = new RelayCommand(ExecuteStopJob);
+            AddJobCommand = new RelayViewModel(ExecuteAddJob);
+            ExecuteSelectionCommand = new RelayViewModel(ExecuteSelectedJob);
+            DeleteJobCommand = new RelayViewModel(ExecuteDeleteJob);
+            PauseJobCommand = new RelayViewModel(ExecutePauseJob);
+            ResumeJobCommand = new RelayViewModel(ExecuteResumeJob);
+            StopJobCommand = new RelayViewModel(ExecuteStopJob);
 
             RegisterEngineEvents();
         }

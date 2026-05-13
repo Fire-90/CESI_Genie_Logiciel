@@ -16,10 +16,10 @@ namespace Graphic
         {
             InitializeComponent();
 
-            var configManager = new ConfigManager();
+            var configManager = new SettingService();
             var appSettings = configManager.LoadSettings();
-            var stateTracker = new StateTracker(appSettings.Jobs);
-            var engine = new BackupEngine(stateTracker, configManager);
+            var stateTracker = new StateService(appSettings.Jobs);
+            var engine = new BackupService(stateTracker, configManager);
 
             var networkService = new NetworkService(configManager);
 

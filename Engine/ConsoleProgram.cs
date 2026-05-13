@@ -12,9 +12,9 @@ namespace EasySave.ConsoleApp
     class ConsoleProgram
     {
         private static ConsoleView _view;
-        private static BackupEngine _engine;
-        private static ConfigManager _configManager;
-        private static StateTracker _stateTracker;
+        private static BackupService _engine;
+        private static SettingService _configManager;
+        private static StateService _stateTracker;
         private static AppSettings _appSettings;
         private static List<BackupJob> _jobs;
 
@@ -23,17 +23,17 @@ namespace EasySave.ConsoleApp
             _view = new ConsoleView();
 
             string lang = _view.ChooseLanguage();
-            LanguageManager.SetLanguage(lang);
+            LanguageView.SetLanguage(lang);
 
-            _configManager = new ConfigManager();
+            _configManager = new SettingService();
 
             _appSettings = _configManager.LoadSettings();
 
             ConfigureLogFormat();
 
             _jobs = _appSettings.Jobs;
-            _stateTracker = new StateTracker(_jobs);
-            _engine = new BackupEngine(_stateTracker, _configManager);
+            _stateTracker = new StateService(_jobs);
+            _engine = new BackupService(_stateTracker, _configManager);
 
             _engine.OnProgressUpdate += (file, remaining) =>
                 _view.DisplayMessage("Copying", file);

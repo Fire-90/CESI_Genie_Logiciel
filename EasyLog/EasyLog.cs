@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace EasyLog
@@ -35,6 +31,7 @@ namespace EasyLog
 
     public sealed class DailyLogger
     {
+        // Singleton
         private static readonly Lazy<DailyLogger> _instance = new Lazy<DailyLogger>(() => new DailyLogger());
         public static DailyLogger Instance => _instance.Value;
 
@@ -42,6 +39,7 @@ namespace EasyLog
         private readonly string _settingsFilePath;
         private static readonly object _lockObj = new object();
 
+        // Observer
         public static event Action<string, string, LogEntry> OnLogGenerated;
 
         private DailyLogger()

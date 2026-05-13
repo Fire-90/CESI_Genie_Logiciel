@@ -1,16 +1,15 @@
 ﻿using EasySave.Services;
 using System.ComponentModel;
 using System.Text.Json;
-using System.Threading;
 using System.Windows.Input;
 
 namespace EasySave.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {
-        private readonly ConfigManager _configManager;
-        private readonly BackupEngine _backupEngine;
-        private readonly StateTracker _stateTracker;
+        private readonly SettingService _configManager;
+        private readonly BackupService _backupEngine;
+        private readonly StateService _stateTracker;
         private readonly NetworkService _networkService;
         private readonly SynchronizationContext _syncContext;
 
@@ -24,7 +23,7 @@ namespace EasySave.ViewModels
 
         public ICommand ToggleSettingsCommand { get; }
 
-        public MainViewModel(ConfigManager configManager, StateTracker stateTracker, BackupEngine backupEngine, NetworkService networkService)
+        public MainViewModel(SettingService configManager, StateService stateTracker, BackupService backupEngine, NetworkService networkService)
         {
             _configManager = configManager;
             _stateTracker = stateTracker;
@@ -40,7 +39,7 @@ namespace EasySave.ViewModels
 
             NetworkVM.OnNewRemoteActivity += (msg) => { JobVM.ExternalActivityUpdate(msg); };
 
-            ToggleSettingsCommand = new RelayCommand(p => IsSettingsOpen = !IsSettingsOpen);
+            ToggleSettingsCommand = new RelayViewModel(p => IsSettingsOpen = !IsSettingsOpen);
 
             EasyLog.DailyLogger.OnLogGenerated += (jobId, format, entry) =>
             {
@@ -48,7 +47,7 @@ namespace EasySave.ViewModels
                 catch { }
             };
 
-            EasySave.Services.StateTracker.OnStateUpdated += (jsonState) => { _networkService.SendMessage($"[STATE]|{jsonState}"); };
+            EasySave.Services.StateService.OnStateUpdated += (jsonState) => { _networkService.SendMessage($"[STATE]|{jsonState}"); };
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
